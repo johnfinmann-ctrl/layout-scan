@@ -1,0 +1,3139 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LayoutScan Pro — v0.5 (Sprint 5 · Professional Reporting Edition)</title>
+<style>
+  :root{
+    --navy:#0B1E33;
+    --navy-deep:#071527;
+    --navy-mid:#132A45;
+    --white:#FFFFFF;
+    --gray-bg:#EEF1F4;
+    --gray-canvas:#F5F7F9;
+    --border:#D7DEE6;
+    --border-strong:#B9C4CF;
+    --green:#3A9D5D;
+    --green-dark:#2C7A47;
+    --text:#1B2733;
+    --text-mute:#5B6B7A;
+    --danger:#C0392B;
+    --guide:#E040FB;
+    --accent2:#E67E22;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%; width:100%;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:var(--text); background:var(--gray-bg);
+    overflow:hidden; -webkit-user-select:none; user-select:none;
+  }
+  #app{
+    display:grid;
+    grid-template-columns:250px 1fr 300px;
+    grid-template-rows:auto auto auto 1fr auto;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "scorecards scorecards scorecards"
+      "dashboard dashboard dashboard"
+      "palette canvas props"
+      "palette status props";
+    height:100vh; width:100vw;
+  }
+
+  /* ---------- DASHBOARD 2.0 — STORE SCOREKORT (Sprint 4) ---------- */
+  #scoreCards{
+    grid-area:scorecards;
+    background:var(--gray-bg);
+    border-bottom:1px solid var(--border);
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(178px, 1fr));
+    gap:9px; padding:9px 12px;
+  }
+  .scard{
+    min-height:80px;
+    display:flex; flex-direction:column; justify-content:center; gap:3px;
+    background:var(--white); border-radius:12px; padding:11px 14px;
+    border:1px solid var(--border); border-left:4px solid var(--border-strong);
+    box-shadow:0 1.6px 3.6px rgba(11,30,51,.08), 0 0.5px 1px rgba(11,30,51,.06);
+  }
+  .scard.s-green{border-left-color:var(--green); background:linear-gradient(180deg,#F2FBF5 0%, var(--white) 65%);}
+  .scard.s-yellow{border-left-color:#E1A73C; background:linear-gradient(180deg,#FEF9EE 0%, var(--white) 65%);}
+  .scard.s-orange{border-left-color:#E67E22; background:linear-gradient(180deg,#FDF2E9 0%, var(--white) 65%);}
+  .scard.s-red{border-left-color:var(--danger); background:linear-gradient(180deg,#FCEEEC 0%, var(--white) 65%);}
+  .scard.s-neutral{border-left-color:#B9C4CF;}
+  .scard-head{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .scard-icon{font-size:14px; flex:0 0 auto; opacity:.85;}
+  .scard-trend{font-size:9.5px; font-weight:700; display:flex; align-items:center; gap:2px; white-space:nowrap; flex:0 1 auto; overflow:hidden; text-overflow:ellipsis;}
+  .scard-trend.up{color:var(--green-dark);}
+  .scard-trend.down{color:var(--danger);}
+  .scard-trend.flat{color:var(--text-mute);}
+  .scard-value{font-size:22px; font-weight:800; color:var(--navy); line-height:1.05;}
+  .scard-value .unit{font-size:12px; font-weight:600; color:var(--text-mute); margin-left:2px;}
+  .scard-label{font-size:9.5px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.4px;}
+  .scard-chip{
+    display:inline-block; align-self:flex-start; margin-top:4px; font-size:9.5px; font-weight:700; padding:2px 8px; border-radius:9px;
+  }
+  .scard-chip.s-green{background:rgba(58,157,93,.14); color:var(--green-dark);}
+  .scard-chip.s-yellow{background:rgba(225,167,60,.18); color:#8A6410;}
+  .scard-chip.s-orange{background:rgba(230,126,34,.16); color:#A35316;}
+  .scard-chip.s-red{background:rgba(192,57,43,.14); color:var(--danger);}
+  .scard-chip.s-neutral{background:var(--gray-canvas); color:var(--text-mute);}
+
+  /* ---------- RAPPORTKORT & FORSLAG (Analyse-fane, Sprint 4) ---------- */
+  .reportcard{
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-deep) 100%); color:#fff;
+    border-radius:10px; padding:14px 16px; margin-bottom:14px;
+  }
+  .reportcard-top{display:flex; align-items:center; gap:16px;}
+  .reportcard-score{font-size:34px; font-weight:800; line-height:1;}
+  .reportcard-score .unit{font-size:14px; color:#9FB3C8;}
+  .reportcard-risk{padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; display:inline-block;}
+  .reportcard-risk.s-green{background:rgba(58,157,93,.25); color:#8FE3AC;}
+  .reportcard-risk.s-yellow{background:rgba(225,167,60,.25); color:#F5D998;}
+  .reportcard-risk.s-orange{background:rgba(230,126,34,.25); color:#F7C393;}
+  .reportcard-risk.s-red{background:rgba(192,57,43,.3); color:#F5A79E;}
+  .reportcard-risk.s-neutral{background:rgba(159,179,200,.25); color:#C7D4E1;}
+  .reportcard-summary{font-size:11.5px; color:#C7D4E1; margin-top:8px; line-height:1.6;}
+  .rec-row{
+    display:flex; align-items:flex-start; gap:9px; padding:10px 9px; border-radius:7px;
+    border:1px solid var(--border); margin-bottom:6px; cursor:pointer; background:var(--white);
+  }
+  .rec-row:hover{background:var(--gray-canvas);}
+  .rec-row.nozoom{cursor:default;}
+  .rec-num{
+    flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--navy); color:#fff;
+    font-size:10.5px; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px;
+  }
+  .rec-text{font-size:12px; line-height:1.45; color:var(--text);}
+  .rec-impact{font-size:10.5px; color:var(--green-dark); font-weight:600; margin-top:2px;}
+
+  /* ---------- DASHBOARD ---------- */
+  #dashboard{
+    grid-area:dashboard;
+    background:var(--white);
+    border-bottom:1px solid var(--border);
+    display:flex; flex-wrap:wrap; align-items:stretch; gap:7px;
+    padding:8px 12px;
+  }
+  .kpi-card{
+    flex:1 1 108px; min-width:92px; min-height:42px;
+    background:var(--gray-canvas); border:1px solid var(--border); border-radius:8px;
+    padding:6px 11px; display:flex; flex-direction:column; justify-content:center;
+    box-shadow:0 1px 2px rgba(11,30,51,.05);
+  }
+  .kpi-card .kval{font-size:14.5px; font-weight:800; color:var(--navy); line-height:1.15;}
+  .kpi-card .klabel{font-size:8.5px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.35px; margin-top:1px;}
+  .kpi-card.warn .kval{color:#B8860B;}
+  .kpi-card.danger .kval{color:var(--danger);}
+  .score-cluster{
+    flex:1 1 300px; display:flex; align-items:center; gap:9px;
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-deep) 100%);
+    border-radius:8px; padding:6px 14px; color:#fff; min-height:42px;
+  }
+  .score-overall{text-align:center; padding-right:10px; border-right:1px solid #2A4562; flex:0 0 auto;}
+  .score-overall .sval{font-size:19px; font-weight:800; line-height:1;}
+  .score-overall .slabel{font-size:8px; letter-spacing:.4px; color:#9FB3C8; text-transform:uppercase; margin-top:1px;}
+  .score-bars{display:flex; gap:8px; flex-wrap:wrap;}
+  .score-bar-item{width:56px;}
+  .score-bar-item .sblabel{font-size:8.5px; color:#9FB3C8; text-transform:uppercase; margin-bottom:3px;}
+  .score-bar-track{background:#0F2743; border-radius:4px; height:5px; overflow:hidden;}
+  .score-bar-fill{height:100%; border-radius:4px;}
+  .score-bar-item .sbval{font-size:11px; font-weight:700; margin-top:2px;}
+
+  /* ---------- TOPBAR ---------- */
+  #topbar{
+    grid-area:topbar;
+    background:linear-gradient(180deg,var(--navy) 0%,var(--navy-deep) 100%);
+    color:var(--white);
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    padding:5px 16px; min-height:42px; row-gap:5px;
+    border-bottom:1px solid #02101f;
+    position:relative; z-index:20;
+  }
+  .brand{display:flex; align-items:center; gap:8px;}
+  .brand-mark{
+    width:21px; height:21px; border-radius:5px;
+    background:var(--green);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:11px; color:var(--navy-deep);
+  }
+  .brand-text{display:flex; flex-direction:column; line-height:1.05;}
+  .brand-text .name{font-size:12.5px; font-weight:600; letter-spacing:.2px;}
+  .brand-text .sub{font-size:9.5px; color:#9FB3C8; letter-spacing:.2px;}
+  .toolbar-group{display:flex; align-items:center; gap:5px; position:relative; flex-wrap:wrap; row-gap:5px; justify-content:flex-end;}
+  .toolbar-divider{width:1px; height:19px; background:#26405E; margin:0 6px;}
+  .tbtn{
+    background:#132A45; color:#D9E4EF; border:1px solid #26405E;
+    border-radius:6px; padding:5px 9px; font-size:11.5px; font-weight:500;
+    cursor:pointer; display:flex; align-items:center; gap:6px;
+    transition:background .12s ease;
+  }
+  .tbtn:hover{background:#1B3454;}
+  .tbtn.active{background:var(--green); border-color:var(--green-dark); color:#06210F;}
+  .tbtn:disabled{opacity:.4; cursor:default;}
+  .tbtn.danger:hover{background:#5A2420; border-color:#7A332C;}
+  select.tbselect{
+    background:#132A45; color:#D9E4EF; border:1px solid #26405E;
+    border-radius:6px; padding:5px 7px; font-size:11.5px; cursor:pointer;
+  }
+
+  /* ---------- VIS-DROPDOWN ---------- */
+  #viewMenu{
+    position:absolute; top:34px; right:0; z-index:50;
+    background:var(--white); border:1px solid var(--border); border-radius:8px;
+    box-shadow:0 8px 24px rgba(7,21,39,.22); padding:10px; width:210px;
+    display:none;
+  }
+  #viewMenu.open{display:block;}
+  #viewMenu label{
+    display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text);
+    padding:6px 4px; cursor:pointer; border-radius:6px;
+  }
+  #viewMenu label:hover{background:var(--gray-canvas);}
+
+  /* ---------- TRUCKS-DROPDOWN ---------- */
+  #truckMenu{
+    position:absolute; top:34px; right:0; z-index:50;
+    background:var(--white); border:1px solid var(--border); border-radius:8px;
+    box-shadow:0 8px 24px rgba(7,21,39,.22); padding:12px; width:270px;
+    display:none; color:var(--text);
+  }
+  #truckMenu.open{display:block;}
+  #truckMenu .field label{color:var(--text-mute);}
+  #truckSpecBox{
+    font-size:11px; color:var(--text-mute); line-height:1.7;
+    background:var(--gray-canvas); border-radius:6px; padding:8px 10px; margin-top:8px;
+  }
+  #truckSpecBox b{color:var(--text);}
+
+  /* ---------- ANALYSE-FANE ---------- */
+  .finding-row{
+    display:flex; align-items:flex-start; gap:8px; padding:9px 8px; border-radius:7px;
+    border:1px solid var(--border); margin-bottom:6px; cursor:pointer; background:var(--white);
+  }
+  .finding-row:hover{background:var(--gray-canvas);}
+  .finding-row.nozoom{cursor:default;}
+  .finding-dot{width:9px; height:9px; border-radius:50%; margin-top:4px; flex:0 0 auto;}
+  .finding-dot.yellow{background:#E1A73C;}
+  .finding-dot.red{background:var(--danger);}
+  .finding-dot.info{background:#8E7CC3;}
+  .finding-text{font-size:12px; line-height:1.4; color:var(--text);}
+  .finding-type{font-size:9.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-mute); display:block; margin-bottom:2px;}
+
+  /* ---------- PALETTE ---------- */
+  #palette{
+    grid-area:palette;
+    background:var(--white);
+    border-right:1px solid var(--border);
+    overflow-y:auto;
+    padding:14px 12px;
+  }
+  .palette-title{
+    font-size:11px; text-transform:uppercase; letter-spacing:.6px;
+    color:var(--text-mute); font-weight:700; margin:6px 4px 10px;
+  }
+  details.category{
+    border:1px solid var(--border); border-radius:8px; margin-bottom:8px; overflow:hidden;
+  }
+  details.category summary{
+    list-style:none; cursor:pointer; padding:9px 10px; font-size:12px; font-weight:700;
+    color:var(--navy); background:var(--gray-canvas); display:flex; align-items:center; justify-content:space-between;
+  }
+  details.category summary::-webkit-details-marker{display:none;}
+  details.category summary::after{content:"▾"; color:var(--text-mute); font-size:10px; transition:transform .15s;}
+  details.category[open] summary::after{transform:rotate(180deg);}
+  details.category .cat-body{padding:8px;}
+  .palette-item{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 9px; margin-bottom:5px;
+    border:1px solid var(--border); border-radius:8px;
+    background:var(--white); cursor:grab;
+    touch-action:none;
+  }
+  .palette-item:last-child{margin-bottom:0;}
+  .palette-item:hover{border-color:var(--border-strong); background:#EFF3F6;}
+  .palette-item.armed{border-color:var(--green); background:#EAF7EF; box-shadow:0 0 0 2px rgba(58,157,93,.25) inset;}
+  .swatch{width:15px; height:15px; border-radius:3px; flex:0 0 auto; border:1px solid rgba(0,0,0,.15);}
+  .palette-item .plabel{font-size:12px; font-weight:600; color:var(--text);}
+  .palette-item .pdim{font-size:10px; color:var(--text-mute); margin-left:auto; white-space:nowrap;}
+  .palette-hint{
+    font-size:11px; color:var(--text-mute); line-height:1.5;
+    padding:10px; margin-top:8px; background:var(--gray-canvas);
+    border-radius:8px; border:1px dashed var(--border-strong);
+  }
+
+  /* ---------- CANVAS ---------- */
+  #canvasWrap{
+    grid-area:canvas;
+    position:relative;
+    background:var(--gray-canvas);
+    overflow:hidden;
+  }
+  #stage{display:block; touch-action:none; cursor:crosshair;}
+  #stage.panning{cursor:grabbing;}
+  #stage.placing{cursor:copy;}
+  #ghostChip{
+    position:fixed; pointer-events:none; z-index:999;
+    padding:6px 10px; border-radius:6px; font-size:12px; font-weight:600;
+    color:#fff; background:var(--navy); opacity:.9; display:none;
+    transform:translate(-50%,-140%);
+    white-space:nowrap;
+  }
+  #heatLegend{
+    position:absolute; left:12px; bottom:12px; z-index:15;
+    background:rgba(255,255,255,.96); border:1px solid var(--border); border-radius:8px;
+    padding:8px 10px; font-size:10.5px; color:var(--text); box-shadow:0 2px 8px rgba(11,30,51,.12);
+    display:none;
+  }
+  #heatLegend.show{display:block;}
+  #heatLegend .hl-title{font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-mute); margin-bottom:5px;}
+  #heatLegend .hl-row{display:flex; align-items:center; gap:6px; margin-bottom:3px;}
+  #heatLegend .hl-dot{width:9px; height:9px; border-radius:50%; flex:0 0 auto;}
+
+  /* ---------- STATUS BAR ---------- */
+  #statusbar{
+    grid-area:status;
+    background:var(--navy-deep); color:#9FB3C8;
+    font-size:11px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 18px;
+    padding:6px 14px; border-top:1px solid #02101f; min-height:30px;
+  }
+  #statusbar span b{color:#E7EEF4; font-weight:600;}
+
+  /* ---------- PROPERTIES ---------- */
+  #properties{
+    grid-area:props;
+    background:var(--white);
+    border-left:1px solid var(--border);
+    overflow-y:auto;
+    display:flex; flex-direction:column;
+  }
+  .props-tabs{display:flex; border-bottom:1px solid var(--border); flex:0 0 auto;}
+  .props-tab{
+    flex:1; text-align:center; padding:11px 0; font-size:12px; font-weight:700;
+    color:var(--text-mute); cursor:pointer; background:var(--gray-canvas);
+    border-bottom:2px solid transparent;
+  }
+  .props-tab.active{color:var(--navy); background:var(--white); border-bottom-color:var(--green);}
+  #propsPane{padding:16px 16px; overflow-y:auto; flex:1;}
+  .props-title{
+    font-size:11px; text-transform:uppercase; letter-spacing:.6px;
+    color:var(--text-mute); font-weight:700; margin-bottom:12px;
+  }
+  .empty-state{
+    color:var(--text-mute); font-size:12.5px; line-height:1.6;
+    padding:14px; background:var(--gray-canvas); border-radius:8px;
+    border:1px dashed var(--border-strong);
+  }
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:11px; color:var(--text-mute); font-weight:600; margin-bottom:4px;}
+  .field input[type=text], .field input[type=number], .field textarea, .field select{
+    width:100%; padding:7px 8px; border:1px solid var(--border); border-radius:6px;
+    font-size:13px; color:var(--text); background:var(--white); font-family:inherit;
+  }
+  .field textarea{resize:vertical; min-height:52px;}
+  .field input:focus, .field textarea:focus, .field select:focus{outline:none; border-color:var(--green); box-shadow:0 0 0 2px rgba(58,157,93,.18);}
+  .field input[type=color]{width:100%; height:32px; padding:2px; cursor:pointer;}
+  .field-row{display:flex; gap:8px;}
+  .field-row .field{flex:1;}
+  .field-row-3 .field{flex:1;}
+  .rotate-row{display:flex; align-items:center; gap:8px;}
+  .rotate-row input[type=range]{flex:1;}
+  .rotate-value{font-size:12px; color:var(--text-mute); width:38px; text-align:right;}
+  .prop-actions{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;}
+  .prop-actions .tbtn{flex:1; min-width:60px; justify-content:center; background:var(--gray-canvas); color:var(--text); border-color:var(--border);}
+  .prop-actions .tbtn:hover{background:#E7ECEF;}
+  .prop-actions .tbtn.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .prop-actions .delete-btn{color:var(--danger); border-color:#EAD3D0;}
+  .prop-actions .delete-btn:hover{background:#FBEBEA;}
+  .meta-line{font-size:10.5px; color:var(--text-mute); margin-top:14px; padding-top:12px; border-top:1px solid var(--border); line-height:1.6;}
+  .section-divider{font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-mute); font-weight:700; margin:16px 0 8px; padding-top:12px; border-top:1px solid var(--border);}
+
+  /* layers tab */
+  .layer-row{
+    display:flex; align-items:center; gap:8px; padding:8px 6px; border-radius:6px; margin-bottom:4px;
+    border:1px solid var(--border);
+  }
+  .layer-row input[type=text]{border:none; background:transparent; font-size:12.5px; font-weight:600; flex:1; padding:2px;}
+  .layer-row input[type=text]:focus{outline:none; background:var(--gray-canvas); border-radius:4px;}
+  .layer-swatch{width:10px; height:10px; border-radius:50%; flex:0 0 auto;}
+  .layer-count{font-size:10.5px; color:var(--text-mute); min-width:16px; text-align:right;}
+  .icon-btn{
+    background:none; border:none; cursor:pointer; font-size:14px; padding:2px 4px; border-radius:4px; color:var(--text-mute);
+  }
+  .icon-btn:hover{background:var(--gray-canvas);}
+  .icon-btn.off{color:#C9D2DA;}
+
+  /* measurement panel */
+  .measure-pair{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
+  .measure-chip{font-size:11px; padding:4px 8px; border-radius:12px; background:var(--gray-canvas); border:1px solid var(--border); font-weight:600;}
+  .measure-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+  .measure-cell{background:var(--gray-canvas); border:1px solid var(--border); border-radius:8px; padding:9px;}
+  .measure-cell .mlabel{font-size:10px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px;}
+  .measure-cell .mvalue{font-size:15px; font-weight:700; color:var(--navy);}
+  .measure-cell .mvalue.na{color:var(--text-mute); font-weight:500; font-size:12px;}
+
+  @media (max-width:900px){
+    #app{grid-template-columns:0 1fr 0;}
+    #palette,#properties{display:none;}
+  }
+
+  /* =========================================================
+     SPRINT 5 — RAPPORT-MODAL, EKSPORT & PRINT
+     Rent additiv: rører ikke #app, #stage, canvas-motoren,
+     dashboardet, truckbiblioteket eller nogen eksisterende ids.
+     ========================================================= */
+  .report-modal{
+    position:fixed; inset:0; background:rgba(7,21,39,.55); z-index:300;
+    display:none; overflow-y:auto; padding:24px 12px;
+  }
+  .report-modal.open{display:block;}
+  .report-modal-inner{
+    max-width:900px; margin:0 auto 40px; background:#fff; border-radius:12px;
+    box-shadow:0 12px 40px rgba(0,0,0,.3); overflow:hidden;
+  }
+  .report-toolbar{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    background:var(--navy); color:#fff; padding:14px 20px; position:sticky; top:0; z-index:2;
+  }
+  .report-toolbar h3{margin:0; font-size:15px; font-weight:700;}
+  .report-actions{display:flex; gap:8px; flex-wrap:wrap;}
+  .report-actions button{
+    background:#132A45; color:#D9E4EF; border:1px solid #26405E; border-radius:6px;
+    padding:7px 11px; font-size:11.5px; font-weight:600; cursor:pointer;
+  }
+  .report-actions button:hover{background:#1B3454;}
+  .report-actions button.primary{background:var(--green); border-color:var(--green-dark); color:#06210F;}
+  .report-actions button.close-btn{background:#5A2420; border-color:#7A332C;}
+
+  .report-settings{
+    background:var(--gray-canvas); padding:16px 20px; border-bottom:1px solid var(--border);
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:10px;
+  }
+  .report-settings .field label{font-size:10.5px;}
+  .report-settings .field input, .report-settings .field select{font-size:12.5px; padding:6px 8px;}
+  .report-settings-actions{grid-column:1/-1; display:flex; justify-content:flex-end; gap:8px;}
+
+  #reportContent{padding:0;}
+  .rp-page{padding:34px 40px; border-bottom:1px dashed var(--border);}
+  .rp-page:last-child{border-bottom:none;}
+  .rp-cover{
+    background:linear-gradient(160deg,var(--navy) 0%, var(--navy-deep) 100%); color:#fff;
+    min-height:520px; display:flex; flex-direction:column; justify-content:space-between;
+    padding:48px 44px;
+  }
+  .rp-cover-top{display:flex; align-items:center; gap:14px;}
+  .rp-cover-logo{max-height:56px; max-width:180px;}
+  .rp-cover-logo-fallback{
+    width:48px; height:48px; border-radius:10px; background:var(--green);
+    display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--navy-deep); font-size:18px;
+  }
+  .rp-cover-title{font-size:30px; font-weight:800; margin-top:26px;}
+  .rp-cover-sub{font-size:14px; color:#9FB3C8; margin-top:6px;}
+  .rp-cover-meta{margin-top:32px; font-size:13px; line-height:2;}
+  .rp-cover-meta b{color:#fff; font-weight:700;}
+  .rp-cover-footnote{font-size:10.5px; color:#9FB3C8; opacity:.85; border-top:1px solid #26405E; padding-top:12px;}
+
+  .rp-h1{font-size:19px; font-weight:800; color:var(--navy); margin:0 0 14px; padding-bottom:8px; border-bottom:2px solid var(--green);}
+  .rp-h2{font-size:13px; font-weight:700; color:var(--navy); margin:18px 0 8px; text-transform:uppercase; letter-spacing:.4px;}
+  .rp-text{font-size:12.5px; color:var(--text); line-height:1.7;}
+  .rp-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px; margin-top:8px;}
+  .rp-stat{background:var(--gray-canvas); border:1px solid var(--border); border-radius:8px; padding:10px 12px;}
+  .rp-stat .v{font-size:18px; font-weight:800; color:var(--navy);}
+  .rp-stat .l{font-size:9.5px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.3px; margin-top:2px;}
+  .rp-img{width:100%; border:1px solid var(--border); border-radius:8px; margin-top:8px; display:block;}
+  .rp-legend{display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:11px; color:var(--text);}
+  .rp-legend span.dot{width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px;}
+  .rp-table{width:100%; border-collapse:collapse; margin-top:8px; font-size:11.5px;}
+  .rp-table th{background:var(--gray-canvas); text-align:left; padding:7px 9px; border:1px solid var(--border); font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; color:var(--text-mute);}
+  .rp-table td{padding:7px 9px; border:1px solid var(--border); vertical-align:top;}
+  .rp-badge{display:inline-block; padding:2px 8px; border-radius:9px; font-size:10px; font-weight:700;}
+  .rp-badge.red{background:rgba(192,57,43,.14); color:var(--danger);}
+  .rp-badge.orange{background:rgba(230,126,34,.16); color:#A35316;}
+  .rp-badge.yellow{background:rgba(225,167,60,.18); color:#8A6410;}
+  .rp-badge.green{background:rgba(58,157,93,.14); color:var(--green-dark);}
+  .rp-note{font-size:10.5px; color:var(--text-mute); font-style:italic; margin-top:10px;}
+
+  .report-history{background:var(--gray-canvas); padding:16px 20px;}
+  .report-history table{width:100%; border-collapse:collapse; font-size:11.5px; margin-bottom:10px;}
+  .report-history th, .report-history td{padding:6px 8px; border:1px solid var(--border); text-align:left;}
+  .report-history .hist-form{display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;}
+  .report-history .hist-form .field{flex:1; min-width:140px;}
+
+  @media print{
+    body *{visibility:hidden;}
+    .report-modal, .report-modal *{visibility:visible;}
+    .report-modal{position:absolute; inset:auto; top:0; left:0; width:100%; background:#fff; padding:0; overflow:visible;}
+    .report-modal-inner{box-shadow:none; max-width:none; margin:0;}
+    .no-print{display:none !important;}
+    .rp-page{page-break-after:always; border-bottom:none;}
+    .rp-page:last-child{page-break-after:auto;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-mark">LS</div>
+      <div class="brand-text">
+        <span class="name">LayoutScan Pro</span>
+        <span class="sub">Nordic Operations · Sprint 5 — Professional Reporting Edition</span>
+      </div>
+    </div>
+
+    <div class="toolbar-group">
+      <button class="tbtn" id="btnZoomOut" title="Zoom ud">−</button>
+      <button class="tbtn" id="btnZoomReset" title="Nulstil zoom">100%</button>
+      <button class="tbtn" id="btnZoomIn" title="Zoom ind">+</button>
+      <button class="tbtn" id="btnFit" title="Tilpas visning">Fit</button>
+      <div class="toolbar-divider"></div>
+      <button class="tbtn active" id="btnGrid" title="Vis/skjul grid">Grid</button>
+      <button class="tbtn active" id="btnSnap" title="Snap til grid/objekter">Snap</button>
+      <select class="tbselect" id="gridSizeSelect" title="Gridstørrelse">
+        <option value="0.5">0.5 m</option>
+        <option value="1" selected>1 m</option>
+        <option value="2">2 m</option>
+      </select>
+      <div class="toolbar-divider"></div>
+      <div style="position:relative;">
+        <button class="tbtn" id="btnViewMenu" title="Visningsindstillinger">Vis ▾</button>
+        <div id="viewMenu">
+          <label><input type="checkbox" id="chkDims"> Vis mål på objekter</label>
+          <label><input type="checkbox" id="chkNames" checked> Vis objektnavne</label>
+          <label><input type="checkbox" id="chkMeasureLines" checked> Vis mållinjer (måleværktøj)</label>
+          <label><input type="checkbox" id="chkHeatmap" checked> Vis heatmap (analyse)</label>
+        </div>
+      </div>
+      <div class="toolbar-divider"></div>
+      <div style="position:relative;">
+        <button class="tbtn" id="btnTruckMenu" title="Vælg truck og kør gangbreddekontrol">Trucks ▾</button>
+        <div id="truckMenu">
+          <div class="field">
+            <label>Aktiv truck (bruges til gangbreddekontrol)</label>
+            <select id="truckSelect"></select>
+          </div>
+          <div id="truckSpecBox"></div>
+          <button class="tbtn" id="btnAddTruck" style="width:100%; margin-top:10px; justify-content:center;">+ Tilføj brugerdefineret truck</button>
+          <div id="addTruckForm" style="display:none; margin-top:10px;">
+            <div class="field"><label>Navn</label><input type="text" id="ntName" placeholder="Fx Egen VNA-model"></div>
+            <div class="field-row">
+              <div class="field"><label>Bredde (m)</label><input type="number" step="0.05" id="ntWidth" value="1.2"></div>
+              <div class="field"><label>Længde (m)</label><input type="number" step="0.05" id="ntLength" value="2.5"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Frihøjde (m)</label><input type="number" step="0.01" id="ntFreeHeight" value="0.1"></div>
+              <div class="field"><label>Vendecirkel (m)</label><input type="number" step="0.05" id="ntTurning" value="2.0"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Anbef. gangbredde (m)</label><input type="number" step="0.05" id="ntAisle" value="2.8"></div>
+              <div class="field"><label>Maks løftehøjde (m)</label><input type="number" step="0.1" id="ntMaxLift" value="6.0"></div>
+            </div>
+            <button class="tbtn active" id="btnSaveTruck" style="width:100%; justify-content:center;">Gem truck</button>
+          </div>
+        </div>
+      </div>
+      <div class="toolbar-divider"></div>
+      <button class="tbtn active" id="btnOpenReport" title="Generér professionel rapport og eksporter">📄 Rapport</button>
+      <div class="toolbar-divider"></div>
+      <button class="tbtn danger" id="btnClear" title="Ryd projekt">Ryd</button>
+    </div>
+  </header>
+
+  <div id="scoreCards"></div>
+
+  <div id="dashboard"></div>
+
+  <aside id="palette">
+    <div class="palette-title">Objektbibliotek</div>
+    <div id="paletteCategories"></div>
+    <div class="palette-hint">
+      Tryk og træk et objekt ind på tegnefladen. Shift-klik to objekter for at måle afstand mellem dem.
+    </div>
+  </aside>
+
+  <main id="canvasWrap">
+    <canvas id="stage"></canvas>
+    <div id="heatLegend">
+      <div class="hl-title">Heatmap</div>
+      <div class="hl-row"><span class="hl-dot" style="background:#3A9D5D"></span>OK</div>
+      <div class="hl-row"><span class="hl-dot" style="background:#E1A73C"></span>Bør undersøges</div>
+      <div class="hl-row"><span class="hl-dot" style="background:#E67E22"></span>Advarsel</div>
+      <div class="hl-row"><span class="hl-dot" style="background:#C0392B"></span>Kritisk</div>
+      <div class="hl-row"><span class="hl-dot" style="background:#8E7CC3"></span>Flaskehals / død zone</div>
+    </div>
+  </main>
+  <div id="ghostChip"></div>
+
+  <div id="statusbar">
+    <span>Areal: <b id="statArea">–</b></span>
+    <span>Ledigt: <b id="statFree">–</b></span>
+    <span>Objekter: <b id="statCount">0</b></span>
+    <span>Valgt: <b id="statSelected">–</b></span>
+    <span>Zoom: <b id="statZoom">100%</b></span>
+    <span>Grid: <b id="statGrid">1 m</b></span>
+    <span>Snap: <b id="statSnap">Til</b></span>
+    <span>Cursor: <b id="statCursor">–</b></span>
+  </div>
+
+  <aside id="properties">
+    <div class="props-tabs">
+      <div class="props-tab active" id="tabProps">Egenskaber</div>
+      <div class="props-tab" id="tabLayers">Layers</div>
+      <div class="props-tab" id="tabAnalyse">Analyse</div>
+    </div>
+    <div id="propsPane">
+      <div id="propsBody">
+        <div class="empty-state">Intet objekt valgt.<br>Klik på et objekt på tegnefladen, eller træk et nyt objekt ud fra biblioteket til venstre.<br><br>Shift-klik to objekter for at få automatiske mål mellem dem.</div>
+      </div>
+      <div id="layersBody" style="display:none;"></div>
+      <div id="analyseBody" style="display:none;"></div>
+    </div>
+  </aside>
+
+</div>
+
+<div id="reportModal" class="report-modal">
+  <div class="report-modal-inner">
+    <div class="report-toolbar no-print">
+      <h3>📄 LayoutScan Pro — Rapport</h3>
+      <div class="report-actions">
+        <button class="primary" id="btnGenerateReport">Generér rapport</button>
+        <button id="btnPrintReport">🖨️ Udskriv / Gem som PDF</button>
+        <button id="btnExportPNG">🖼️ PNG</button>
+        <button id="btnExportExcel">📊 Excel</button>
+        <button id="btnExportCSV">📄 CSV</button>
+        <button id="btnExportJSON">🗂️ JSON</button>
+        <button class="close-btn" id="btnCloseReport">✕ Luk</button>
+      </div>
+    </div>
+
+    <div class="report-settings no-print">
+      <div class="field"><label>Firmanavn</label><input type="text" id="rsCompany" placeholder="Nordic Operations"></div>
+      <div class="field"><label>Rapporttitel</label><input type="text" id="rsTitle" placeholder="LayoutScan Pro — Lagerrapport"></div>
+      <div class="field"><label>Kunde</label><input type="text" id="rsCustomer" placeholder="Kundens navn"></div>
+      <div class="field"><label>Projekt</label><input type="text" id="rsProject" placeholder="Projektnavn"></div>
+      <div class="field"><label>Sprog</label>
+        <select id="rsLanguage"><option value="da">Dansk</option><option value="en">English</option></select>
+      </div>
+      <div class="field"><label>Logo (valgfrit billede)</label><input type="file" id="rsLogoFile" accept="image/*"></div>
+      <div class="field"><label>Sidehoved</label><input type="text" id="rsHeader" placeholder="Fx afdeling/adresse"></div>
+      <div class="field"><label>Sidefod</label><input type="text" id="rsFooter" placeholder="Fx fortroligt/kontakt"></div>
+      <div class="report-settings-actions">
+        <button class="tbtn" id="btnClearLogo">Fjern logo</button>
+      </div>
+    </div>
+
+    <div id="reportContent"></div>
+
+    <div class="report-history no-print">
+      <div class="rp-h2" style="margin-top:0;">Versionshistorik</div>
+      <table id="historyTable"><thead><tr><th>Dato</th><th>Version</th><th>Bruger</th><th>Kommentar</th></tr></thead><tbody id="historyBody"></tbody></table>
+      <div class="hist-form">
+        <div class="field"><label>Dit navn</label><input type="text" id="histUser" placeholder="Fx John Finmann"></div>
+        <div class="field"><label>Kommentar til denne version</label><input type="text" id="histComment" placeholder="Fx 'Sendt til kunde efter møde'"></div>
+        <button class="tbtn active" id="btnSaveVersion" style="margin-bottom:1px;">+ Gem version i historik</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+     1. DATAMODEL
+     ========================================================= */
+
+  // Fuldt objektbibliotek, opdelt i kategorier jf. Sprint 2-kravspec.
+  // w = bredde (m), d = dybde/footprint (m), vh = højde (m, lodret — bruges endnu ikke
+  // i 2D-visning, men gemmes klar til Version 1.5 (3D).
+  const CATEGORIES = [
+    { id:"reoler",         label:"Reoler" },
+    { id:"lager",          label:"Lager" },
+    { id:"bygning",        label:"Bygning" },
+    { id:"infrastruktur",  label:"Infrastruktur" },
+    { id:"annotation",     label:"Annotation" }
+  ];
+
+  const OBJECT_TYPES = [
+    // Reoler
+    { type:"pallereol",     label:"Pallereol",        category:"reoler", color:"#3A9D5D", w:2.7, d:1.1, vh:4.5 },
+    { type:"dobbeltreol",   label:"Dobbelt pallereol",category:"reoler", color:"#2C7A47", w:2.7, d:2.2, vh:4.5 },
+    { type:"smaavarereol",  label:"Småvarereol",      category:"reoler", color:"#4CAF6D", w:1.0, d:0.5, vh:2.0 },
+    { type:"grenreol",      label:"Grenreol",         category:"reoler", color:"#1F6B3A", w:2.0, d:1.2, vh:3.0 },
+    { type:"gennemlobsreol",label:"Gennemløbsreol",   category:"reoler", color:"#237A4E", w:2.7, d:1.4, vh:4.5 },
+    { type:"pushback",      label:"Push Back",        category:"reoler", color:"#185C3A", w:2.7, d:3.6, vh:4.5 },
+
+    // Lager (funktionsområder)
+    { type:"buffer",        label:"Buffer",           category:"lager", color:"#E4C766", w:3.0, d:3.0, vh:0.1 },
+    { type:"pluk",          label:"Pluk",             category:"lager", color:"#E0B84D", w:3.0, d:2.0, vh:0.1 },
+    { type:"pak",           label:"Pak",              category:"lager", color:"#D1A63C", w:3.0, d:2.0, vh:0.1 },
+    { type:"varemodtagelse",label:"Varemodtagelse",   category:"lager", color:"#8FB2D4", w:5.0, d:4.0, vh:0.1 },
+    { type:"forsendelse",   label:"Forsendelse",      category:"lager", color:"#7098BE", w:5.0, d:4.0, vh:0.1 },
+    { type:"crossdock",     label:"Cross Dock",       category:"lager", color:"#5C82A6", w:4.0, d:3.0, vh:0.1 },
+
+    // Bygning
+    { type:"vaeg",          label:"Væg",              category:"bygning", color:"#0B1E33", w:4.0, d:0.2, vh:3.0 },
+    { type:"port",          label:"Port",             category:"bygning", color:"#142F4D", w:3.0, d:0.3, vh:3.5 },
+    { type:"dor",           label:"Dør",              category:"bygning", color:"#345169", w:1.0, d:0.15, vh:2.1 },
+    { type:"vindue",        label:"Vindue",           category:"bygning", color:"#A9C6E0", w:1.5, d:0.15, vh:1.2 },
+    { type:"kontor",        label:"Kontor",           category:"bygning", color:"#5B6B7A", w:4.0, d:4.0, vh:2.5 },
+    { type:"teknikrum",     label:"Teknikrum",        category:"bygning", color:"#6E7B87", w:3.0, d:3.0, vh:2.5 },
+
+    // Infrastruktur
+    { type:"trucklader",    label:"Trucklader",       category:"infrastruktur", color:"#F2A93B", w:1.5, d:1.5, vh:0.1 },
+    { type:"batteriomraade",label:"Batteriområde",    category:"infrastruktur", color:"#F2C75C", w:3.0, d:3.0, vh:0.1 },
+    { type:"affald",        label:"Affald",           category:"infrastruktur", color:"#8D8D8D", w:2.0, d:2.0, vh:0.1 },
+    { type:"sikkerhed",     label:"Sikkerhedszone",   category:"infrastruktur", color:"#C0392B", w:2.0, d:2.0, vh:0.1 },
+    { type:"flugtvej",      label:"Flugtvej",         category:"infrastruktur", color:"#27AE60", w:1.5, d:8.0, vh:0.1 },
+    { type:"gangareal",     label:"Gangareal",        category:"infrastruktur", color:"#DCE3E8", w:2.0, d:6.0, vh:0.1 },
+
+    // Annotation
+    { type:"fritekst",      label:"Fri tekst",        category:"annotation", color:"#FFFFFF", w:2.0, d:1.0, vh:0, isText:true },
+    { type:"pil",           label:"Pil",              category:"annotation", color:"#1B2733", w:2.0, d:0.3, vh:0, isArrow:true },
+    { type:"maalestreg",    label:"Målestreg",        category:"annotation", color:"#E67E22", w:3.0, d:0.05, vh:0, isDimLine:true }
+  ];
+
+  function typeDefOf(type){ return OBJECT_TYPES.find(t => t.type === type) || null; }
+
+  // Truckbibliotek — standardprofiler jf. Sprint 3-kravspec. Mål i meter.
+  // Brugeren kan tilføje flere via "Trucks"-menuen i topbaren (gemmes i state.truckTypes).
+  const DEFAULT_TRUCK_TYPES = [
+    { id:"manuel_palleloefter", name:"Manuel palleløfter", width:0.68, length:1.50, freeHeight:0.085, turningRadius:1.40, recommendedAisle:2.20, maxLiftHeight:0.20, builtin:true },
+    { id:"el_palleloefter",     name:"El-palleløfter",     width:0.72, length:1.60, freeHeight:0.085, turningRadius:1.60, recommendedAisle:2.50, maxLiftHeight:0.20, builtin:true },
+    { id:"stabler",             name:"Stabler",            width:0.80, length:1.60, freeHeight:0.090, turningRadius:1.60, recommendedAisle:2.80, maxLiftHeight:3.50, builtin:true },
+    { id:"reachtruck",          name:"Reachtruck",         width:1.30, length:2.50, freeHeight:0.100, turningRadius:1.90, recommendedAisle:2.90, maxLiftHeight:11.0, builtin:true },
+    { id:"modvaegtstruck",      name:"Modvægtstruck",      width:1.15, length:3.70, freeHeight:0.100, turningRadius:2.30, recommendedAisle:3.50, maxLiftHeight:6.00, builtin:true },
+    { id:"smalgangstruck_vna",  name:"Smalgangstruck (VNA)", width:1.30, length:2.90, freeHeight:0.100, turningRadius:2.00, recommendedAisle:1.80, maxLiftHeight:12.0, builtin:true }
+  ];
+
+  const DEFAULT_LAYERS = [
+    { id:"bygning",      name:"Bygning",      visible:true, locked:false, color:"#0B1E33" },
+    { id:"reoler",       name:"Reoler",       visible:true, locked:false, color:"#3A9D5D" },
+    { id:"sikkerhed",    name:"Sikkerhed",    visible:true, locked:false, color:"#C0392B" },
+    { id:"kommentarer",  name:"Kommentarer",  visible:true, locked:false, color:"#8E7CC3" },
+    { id:"maal",         name:"Mål",          visible:true, locked:false, color:"#E67E22" }
+  ];
+
+  function layerForType(typeDef){
+    if(!typeDef) return "bygning";
+    if(typeDef.type === "maalestreg") return "maal";
+    if(typeDef.category === "annotation") return "kommentarer";
+    if(typeDef.category === "reoler") return "reoler";
+    if(typeDef.category === "infrastruktur") return "sikkerhed";
+    return "bygning"; // bygning + lager (funktionsområder er del af bygningslayoutet)
+  }
+
+  // Ét placeret objekt. Strukturen matcher Sprint 2-kravspecifikationens
+  // udvidede JSON-model og er fortsat forberedt til Version 1.5 (3D).
+  function createObject(typeDef, xMeters, yMeters){
+    const now = new Date().toISOString();
+    return {
+      id: "obj_" + Math.random().toString(36).slice(2,10),
+      type: typeDef.type,
+      name: typeDef.label,
+      label: typeDef.label,
+      category: typeDef.category,
+      x: xMeters,
+      y: yMeters,
+      width: typeDef.w,
+      depth: typeDef.d,
+      height: typeDef.vh || 0,     // lodret højde (m) — forberedt til 3D
+      rotation: 0,
+      layer: layerForType(typeDef),
+      color: typeDef.color,
+      isText: !!typeDef.isText,
+      isArrow: !!typeDef.isArrow,
+      isDimLine: !!typeDef.isDimLine,
+      locked: false,
+      visible: true,
+      created: now,
+      modified: now,
+      zHeight: 0,           // forberedt til 3D
+      material: null,       // forberedt til 3D
+      objectDepth: null,    // forberedt til 3D
+      metadata: { comment:"", bays:0, levels:0, palletSpacesPerBay:0 },
+      // Sprint 3 — analysemotor-felter (udfyldes/genberegnes af runAnalysis())
+      truckType: null,        // valgfrit override af global valgt truck (kun relevant for gangareal)
+      recommendedAisle: null,
+      actualAisle: null,
+      capacity: null,
+      rackType: null,
+      palletCount: null,
+      riskLevel: null,
+      analysisFlags: []
+    };
+  }
+
+  let state = {
+    objects: [],
+    selectedIds: [],
+    camera: { panX: 0, panY: 0, zoom: 1 },
+    showGrid: true,
+    snapEnabled: true,
+    gridSize: 1, // meter
+    layers: DEFAULT_LAYERS.map(l => Object.assign({}, l)),
+    view: { showDimensions:false, showObjectNames:true, showMeasureLines:true, showHeatmap:true },
+    activeTab: "props",
+    truckTypes: DEFAULT_TRUCK_TYPES.map(t => Object.assign({}, t)),
+    selectedTruckId: null,
+    analysis: null,   // udfyldes af runAnalysis() — se afsnit 12
+    sessionStartScore: null,  // LayoutScore fra sidste gang projektet blev gemt — bruges til trendpile (Sprint 4)
+    reportSettings: { companyName:"Nordic Operations", reportTitle:"LayoutScan Pro — Lagerrapport", customerName:"", projectName:"", language:"da", header:"", footer:"", logoDataUrl:null },
+    reportHistory: []  // {date, version, user, comment} — Sprint 5
+  };
+
+  const STORAGE_KEY = "layoutscan_pro_v0_2_project";
+  const PPM = 50; // pixels per meter ved zoom = 1
+
+  function getSelected(){ return state.objects.find(o => o.id === state.selectedId()) || null; }
+  // selectedId(): bekvem "single selection" helper — bruges af alt eksisterende
+  // Sprint 1-kode uændret, uanset om der er 0, 1 eller 2 valgte objekter.
+  state.selectedId = function(){
+    return state.selectedIds.length ? state.selectedIds[state.selectedIds.length-1] : null;
+  };
+
+  function getLayer(id){ return state.layers.find(l => l.id === id) || null; }
+  function objectIsInteractable(obj){
+    if(!obj.visible) return false;
+    const layer = getLayer(obj.layer);
+    if(layer && !layer.visible) return false;
+    return true;
+  }
+  function objectIsLocked(obj){
+    const layer = getLayer(obj.layer);
+    return !!obj.locked || (layer && layer.locked);
+  }
+
+  /* =========================================================
+     2. CANVAS SETUP
+     ========================================================= */
+
+  const canvas = document.getElementById("stage");
+  const ctx = canvas.getContext("2d");
+  const wrap = document.getElementById("canvasWrap");
+  let dpr = window.devicePixelRatio || 1;
+
+  function resizeCanvas(){
+    const rect = wrap.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    canvas.style.width = rect.width + "px";
+    canvas.style.height = rect.height + "px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    render();
+  }
+  window.addEventListener("resize", resizeCanvas);
+
+  /* =========================================================
+     3. KOORDINAT-TRANSFORMATIONER
+     ========================================================= */
+
+  function effScale(){ return PPM * state.camera.zoom; }
+
+  function worldToScreen(xm, ym){
+    return {
+      x: xm * effScale() + state.camera.panX,
+      y: ym * effScale() + state.camera.panY
+    };
+  }
+  function screenToWorld(xs, ys){
+    return {
+      x: (xs - state.camera.panX) / effScale(),
+      y: (ys - state.camera.panY) / effScale()
+    };
+  }
+
+  function snap(valueMeters){
+    if(!state.snapEnabled) return valueMeters;
+    const g = state.gridSize;
+    return Math.round(valueMeters / g) * g;
+  }
+
+  // Axis-aligned bounding box i world-koordinater (tager højde for rotation).
+  // Bruges af smart snap, måleværktøj og areal-beregning.
+  function getAABB(obj){
+    const cx = obj.x + obj.width/2, cy = obj.y + obj.depth/2;
+    if(!obj.rotation){
+      return { minX:obj.x, minY:obj.y, maxX:obj.x+obj.width, maxY:obj.y+obj.depth, cx, cy };
+    }
+    const rad = obj.rotation*Math.PI/180, cos = Math.cos(rad), sin = Math.sin(rad);
+    const hw = obj.width/2, hd = obj.depth/2;
+    const corners = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([lx,ly]) => ({
+      x: cx + lx*cos - ly*sin, y: cy + lx*sin + ly*cos
+    }));
+    const xs = corners.map(c=>c.x), ys = corners.map(c=>c.y);
+    return { minX:Math.min.apply(null,xs), maxX:Math.max.apply(null,xs),
+             minY:Math.min.apply(null,ys), maxY:Math.max.apply(null,ys), cx, cy };
+  }
+
+  /* =========================================================
+     4. RENDERING
+     ========================================================= */
+
+  let renderScheduled = false;
+  function requestRender(){
+    if(renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(() => { renderScheduled = false; render(); });
+  }
+
+  let activeGuides = []; // transiente alignment-guides mens man trækker et objekt
+
+  function render(){
+    const rect = wrap.getBoundingClientRect();
+    ctx.clearRect(0,0,rect.width,rect.height);
+
+    ctx.fillStyle = "#F5F7F9";
+    ctx.fillRect(0,0,rect.width,rect.height);
+
+    if(state.showGrid) drawGrid(rect.width, rect.height);
+
+    if(state.analysis && state.view.showHeatmap) drawHeatmap();
+
+    // objekter tegnes i indsættelsesrækkefølge, filtreret på synlighed (objekt + layer)
+    state.objects.forEach(obj => { if(objectIsInteractable(obj)) drawObject(obj); });
+
+    if(activeGuides.length) drawGuides();
+
+    if(state.analysis) drawAnalysisOverlays();
+
+    const selIds = state.selectedIds;
+    selIds.forEach(id => {
+      const sel = state.objects.find(o => o.id === id);
+      if(sel) drawSelectionChrome(sel, selIds.length > 1);
+    });
+
+    if(selIds.length === 2 && state.view.showMeasureLines){
+      const a = state.objects.find(o => o.id === selIds[0]);
+      const b = state.objects.find(o => o.id === selIds[1]);
+      if(a && b) drawMeasurementOverlay(a,b);
+    }
+
+    drawOrigin();
+  }
+
+  function drawGrid(w, h){
+    const g = state.gridSize;
+    const scale = effScale();
+
+    const topLeft = screenToWorld(0,0);
+    const bottomRight = screenToWorld(w,h);
+
+    const startX = Math.floor(topLeft.x / g) * g;
+    const endX = Math.ceil(bottomRight.x / g) * g;
+    const startY = Math.floor(topLeft.y / g) * g;
+    const endY = Math.ceil(bottomRight.y / g) * g;
+
+    ctx.lineWidth = 1;
+
+    for(let x = startX; x <= endX; x += g){
+      const isMajor = Math.round(x / (g*5)) * (g*5) === x;
+      const p = worldToScreen(x, 0);
+      ctx.strokeStyle = isMajor ? "#C7D1DA" : "#E1E7EC";
+      ctx.beginPath();
+      ctx.moveTo(p.x + 0.5, 0);
+      ctx.lineTo(p.x + 0.5, h);
+      ctx.stroke();
+    }
+    for(let y = startY; y <= endY; y += g){
+      const isMajor = Math.round(y / (g*5)) * (g*5) === y;
+      const p = worldToScreen(0, y);
+      ctx.strokeStyle = isMajor ? "#C7D1DA" : "#E1E7EC";
+      ctx.beginPath();
+      ctx.moveTo(0, p.y + 0.5);
+      ctx.lineTo(w, p.y + 0.5);
+      ctx.stroke();
+    }
+
+    if(scale > 8){
+      ctx.fillStyle = "#8FA0AF";
+      ctx.font = "10px -apple-system, sans-serif";
+      for(let x = startX; x <= endX; x += g*5){
+        const p = worldToScreen(x, 0);
+        if(p.x > 4 && p.x < w-20) ctx.fillText(x.toFixed(0)+"m", p.x+3, 12);
+      }
+    }
+  }
+
+  function drawOrigin(){
+    const p = worldToScreen(0,0);
+    ctx.strokeStyle = "#9FB3C8";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+    ctx.stroke();
+  }
+
+  function drawObject(obj){
+    const scale = effScale();
+    const center = worldToScreen(obj.x + obj.width/2, obj.y + obj.depth/2);
+    const w = obj.width * scale;
+    const d = obj.depth * scale;
+    const locked = objectIsLocked(obj);
+
+    ctx.save();
+    ctx.translate(center.x, center.y);
+    ctx.rotate(obj.rotation * Math.PI/180);
+    ctx.globalAlpha = locked ? 0.85 : 1;
+
+    if(obj.isText){
+      ctx.font = Math.max(12, 14*Math.min(scale/PPM,2)) + "px -apple-system, sans-serif";
+      ctx.fillStyle = "#1B2733";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      if(state.view.showObjectNames) ctx.fillText(obj.label, 0, 0);
+    } else if(obj.isArrow){
+      ctx.strokeStyle = obj.color; ctx.fillStyle = obj.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-w/2,0); ctx.lineTo(w/2-8,0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(w/2,0); ctx.lineTo(w/2-10,-6); ctx.lineTo(w/2-10,6); ctx.closePath(); ctx.fill();
+    } else if(obj.isDimLine){
+      ctx.strokeStyle = obj.color; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-w/2,0); ctx.lineTo(w/2,0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-w/2,-6); ctx.lineTo(-w/2,6); ctx.moveTo(w/2,-6); ctx.lineTo(w/2,6); ctx.stroke();
+      if(state.view.showObjectNames){
+        ctx.fillStyle = obj.color; ctx.font = "10px -apple-system, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+        ctx.fillText(obj.width.toFixed(2)+" m", 0, -8);
+      }
+    } else {
+      ctx.fillStyle = obj.color;
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 1;
+      roundRect(ctx, -w/2, -d/2, w, d, Math.min(4, w*0.06, d*0.06));
+      ctx.fill();
+      ctx.stroke();
+
+      if(w > 34 && d > 16 && state.view.showObjectNames){
+        ctx.fillStyle = isLight(obj.color) ? "#1B2733" : "#FFFFFF";
+        ctx.font = "11px -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(obj.label, 0, 0);
+      }
+      if(state.view.showDimensions && w > 30){
+        ctx.fillStyle = isLight(obj.color) ? "#1B2733" : "#FFFFFF";
+        ctx.font = "9.5px -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.globalAlpha = (locked?0.85:1) * 0.85;
+        ctx.fillText(obj.width.toFixed(1)+"×"+obj.depth.toFixed(1)+"m", 0, d/2 - 10 > 8 ? d/2 - 9 : 9);
+      }
+    }
+
+    // Sprint 3: lille risiko-indikator (gul/rød) i øverste venstre hjørne, hvis analysen har fundet noget
+    if(obj.riskLevel && obj.riskLevel !== "green" && !obj.isText && !obj.isDimLine){
+      ctx.globalAlpha = 1;
+      const rc = obj.riskLevel === "red" ? "#C0392B" : "#E1A73C";
+      ctx.fillStyle = rc;
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(-w/2+9, -d/2+9, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    }
+
+    // lås/skjul-ikon i øverste højre hjørne af objektet
+    if(locked && !obj.isText && !obj.isDimLine){
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.beginPath(); ctx.arc(w/2-9, -d/2+9, 8, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = "#5B6B7A"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = "#5B6B7A"; ctx.font = "9px -apple-system, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🔒", w/2-9, -d/2+9.5);
+    }
+
+    ctx.restore();
+  }
+
+  function isLight(hex){
+    const c = hex.replace("#","");
+    if(c.length < 6) return true;
+    const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
+    return (r*299 + g*587 + b*114)/1000 > 150;
+  }
+
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  // Håndtag: bund-højre (resize) og top-center (rotate)
+  function getHandles(obj){
+    const scale = effScale();
+    const center = worldToScreen(obj.x + obj.width/2, obj.y + obj.depth/2);
+    const w = obj.width * scale, d = obj.depth * scale;
+    const rad = obj.rotation * Math.PI/180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+
+    function toScreen(lx, ly){
+      return { x: center.x + (lx*cos - ly*sin), y: center.y + (lx*sin + ly*cos) };
+    }
+    return {
+      resize: toScreen(w/2, d/2),
+      rotate: toScreen(0, -d/2 - 22),
+      center
+    };
+  }
+
+  function drawSelectionChrome(obj, isMultiSelectPair){
+    const scale = effScale();
+    const center = worldToScreen(obj.x + obj.width/2, obj.y + obj.depth/2);
+    const w = obj.width * scale, d = obj.depth * scale;
+    const locked = objectIsLocked(obj);
+
+    ctx.save();
+    ctx.translate(center.x, center.y);
+    ctx.rotate(obj.rotation * Math.PI/180);
+
+    ctx.strokeStyle = isMultiSelectPair ? "#8E7CC3" : "#3A9D5D";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5,4]);
+    ctx.strokeRect(-w/2-4, -d/2-4, w+8, d+8);
+    ctx.setLineDash([]);
+
+    if(!isMultiSelectPair && !locked){
+      ctx.beginPath();
+      ctx.moveTo(0, -d/2-4);
+      ctx.lineTo(0, -d/2-22);
+      ctx.stroke();
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.strokeStyle = "#3A9D5D";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.rect(w/2-5, d/2-5, 10, 10);
+      ctx.fill(); ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, -d/2-22, 6, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawGuides(){
+    const rect = wrap.getBoundingClientRect();
+    ctx.save();
+    ctx.strokeStyle = "#E040FB";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3,3]);
+    activeGuides.forEach(g => {
+      ctx.beginPath();
+      if(g.axis === "x"){
+        const p = worldToScreen(g.pos, 0);
+        ctx.moveTo(p.x+0.5, 0); ctx.lineTo(p.x+0.5, rect.height);
+      } else {
+        const p = worldToScreen(0, g.pos);
+        ctx.moveTo(0, p.y+0.5); ctx.lineTo(rect.width, p.y+0.5);
+      }
+      ctx.stroke();
+      if(g.type === "equal"){
+        const p = g.axis==="x" ? worldToScreen(g.pos, g.labelY||0) : worldToScreen(g.labelX||0, g.pos);
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#8E24AA";
+        ctx.font = "bold 11px -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("=", p.x, p.y);
+        ctx.setLineDash([3,3]);
+      }
+    });
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // Grafisk måleoverlay mellem to valgte objekter (afstand, fri bredde/længde, gangbredde)
+  function drawMeasurementOverlay(a, b){
+    const ba = getAABB(a), bb = getAABB(b);
+    const overlapY = Math.min(ba.maxY,bb.maxY) - Math.max(ba.minY,bb.minY);
+    const overlapX = Math.min(ba.maxX,bb.maxX) - Math.max(ba.minX,bb.minX);
+
+    ctx.save();
+    ctx.strokeStyle = "#E67E22";
+    ctx.fillStyle = "#E67E22";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4,3]);
+
+    function arrowLine(x1,y1,x2,y2,label){
+      const p1 = worldToScreen(x1,y1), p2 = worldToScreen(x2,y2);
+      ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+      ctx.setLineDash([]);
+      const midX=(p1.x+p2.x)/2, midY=(p1.y+p2.y)/2;
+      ctx.font = "bold 11px -apple-system, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      const textW = ctx.measureText(label).width;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(midX-textW/2-4, midY-16, textW+8, 15);
+      ctx.strokeStyle = "#E67E22"; ctx.lineWidth = 1; ctx.strokeRect(midX-textW/2-4, midY-16, textW+8, 15);
+      ctx.fillStyle = "#E67E22";
+      ctx.fillText(label, midX, midY-2);
+      ctx.setLineDash([4,3]);
+    }
+
+    if(overlapY > 0.01){
+      // objekter side om side horisontalt
+      const y = (Math.max(ba.minY,bb.minY) + Math.min(ba.maxY,bb.maxY)) / 2;
+      const x1 = ba.maxX <= bb.minX ? ba.maxX : bb.maxX;
+      const x2 = ba.maxX <= bb.minX ? bb.minX : ba.minX;
+      arrowLine(x1,y,x2,y, Math.abs(x2-x1).toFixed(2)+" m");
+    } else if(overlapX > 0.01){
+      const x = (Math.max(ba.minX,bb.minX) + Math.min(ba.maxX,bb.maxX)) / 2;
+      const y1 = ba.maxY <= bb.minY ? ba.maxY : bb.maxY;
+      const y2 = ba.maxY <= bb.minY ? bb.minY : ba.minY;
+      arrowLine(x,y1,x,y2, Math.abs(y2-y1).toFixed(2)+" m");
+    } else {
+      arrowLine(ba.cx, ba.cy, bb.cx, bb.cy, Math.hypot(bb.cx-ba.cx, bb.cy-ba.cy).toFixed(2)+" m");
+    }
+    ctx.restore();
+  }
+
+  /* =========================================================
+     5. HIT-TESTING
+     ========================================================= */
+
+  function hitTestHandle(obj, sx, sy){
+    if(objectIsLocked(obj)) return null;
+    const h = getHandles(obj);
+    if(dist(sx,sy,h.resize.x,h.resize.y) < 10) return "resize";
+    if(dist(sx,sy,h.rotate.x,h.rotate.y) < 10) return "rotate";
+    return null;
+  }
+
+  function hitTestObject(sx, sy){
+    for(let i = state.objects.length-1; i >= 0; i--){
+      const obj = state.objects[i];
+      if(!objectIsInteractable(obj)) continue;
+      const w = screenToLocalHit(obj, sx, sy);
+      if(Math.abs(w.x) <= obj.width/2 && Math.abs(w.y) <= obj.depth/2) return obj;
+    }
+    return null;
+  }
+
+  function screenToLocalHit(obj, sx, sy){
+    const world = screenToWorld(sx, sy);
+    const cx = obj.x + obj.width/2, cy = obj.y + obj.depth/2;
+    const dx = world.x - cx, dy = world.y - cy;
+    const rad = -obj.rotation * Math.PI/180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    return { x: dx*cos - dy*sin, y: dx*sin + dy*cos };
+  }
+
+  function dist(x1,y1,x2,y2){ return Math.hypot(x2-x1, y2-y1); }
+
+  /* =========================================================
+     6. POINTER-INTERAKTION (mus, touch og pen samlet)
+     ========================================================= */
+
+  let interaction = null;
+  // interaction.mode: "pan" | "move" | "resize" | "rotate"
+
+  canvas.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+
+  window.addEventListener("keydown", e => {
+    if((e.key === "Delete" || e.key === "Backspace") && state.selectedId()){
+      e.preventDefault(); deleteSelected();
+    }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === "d" && state.selectedIds.length === 1){
+      e.preventDefault(); duplicateSelected();
+    }
+    if(e.key.toLowerCase() === "r" && state.selectedIds.length === 1){
+      const obj = getSelected();
+      if(obj && !objectIsLocked(obj)){ obj.rotation = (obj.rotation + 15) % 360; touch(obj); render(); syncProps(); scheduleSave(); }
+    }
+    if(e.key === "Escape"){
+      cancelPlacement(); selectObject(null);
+    }
+    if(state.selectedIds.length === 1 && e.key.startsWith("Arrow")){
+      const obj = getSelected();
+      if(obj && !objectIsLocked(obj)){
+        const step = state.snapEnabled ? state.gridSize : 0.1;
+        if(e.key === "ArrowUp") obj.y -= step;
+        if(e.key === "ArrowDown") obj.y += step;
+        if(e.key === "ArrowLeft") obj.x -= step;
+        if(e.key === "ArrowRight") obj.x += step;
+        touch(obj); render(); syncProps(); scheduleSave();
+      }
+    }
+  });
+
+  function touch(obj){ obj.modified = new Date().toISOString(); }
+
+  function onPointerDown(e){
+    canvas.setPointerCapture(e.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+
+    if(armedType){
+      placeArmedObject(sx, sy);
+      return;
+    }
+
+    const sel = state.selectedIds.length === 1 ? getSelected() : null;
+    if(sel){
+      const handle = hitTestHandle(sel, sx, sy);
+      if(handle){
+        interaction = { mode: handle, obj: sel, startX: sx, startY: sy,
+          startW: sel.width, startD: sel.depth, startRot: sel.rotation,
+          startObjX: sel.x, startObjY: sel.y };
+        return;
+      }
+    }
+
+    const hit = hitTestObject(sx, sy);
+    if(hit){
+      if(e.shiftKey){
+        selectObject(hit.id, true);
+      } else {
+        selectObject(hit.id, false);
+        if(!objectIsLocked(hit)){
+          const world = screenToWorld(sx, sy);
+          interaction = { mode:"move", obj: hit, offsetX: world.x - hit.x, offsetY: world.y - hit.y };
+        }
+      }
+      return;
+    }
+
+    if(!e.shiftKey) selectObject(null);
+    interaction = { mode:"pan", startX: sx, startY: sy, startPanX: state.camera.panX, startPanY: state.camera.panY };
+    canvas.classList.add("panning");
+  }
+
+  function onPointerMove(e){
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+
+    if(sx >= 0 && sy >= 0 && sx <= rect.width && sy <= rect.height){
+      const world = screenToWorld(sx, sy);
+      document.getElementById("statCursor").textContent = world.x.toFixed(1)+"m, "+world.y.toFixed(1)+"m";
+    }
+
+    if(ghostFollow) updateGhostPosition(e.clientX, e.clientY);
+
+    if(!interaction) return;
+
+    if(interaction.mode === "pan"){
+      state.camera.panX = interaction.startPanX + (sx - interaction.startX);
+      state.camera.panY = interaction.startPanY + (sy - interaction.startY);
+      requestRender();
+      return;
+    }
+
+    if(interaction.mode === "move"){
+      const world = screenToWorld(sx, sy);
+      const rawX = world.x - interaction.offsetX;
+      const rawY = world.y - interaction.offsetY;
+      const snapped = applySmartSnap(interaction.obj, rawX, rawY);
+      interaction.obj.x = snapped.x;
+      interaction.obj.y = snapped.y;
+      activeGuides = snapped.guides;
+      touch(interaction.obj);
+      requestRender(); syncProps();
+      return;
+    }
+
+    if(interaction.mode === "resize"){
+      const local = screenToLocalHit(interaction.obj, sx, sy);
+      const newW = Math.max(state.gridSize/2, snap(Math.abs(local.x)*2));
+      const newD = Math.max(state.gridSize/2, snap(Math.abs(local.y)*2));
+      const cx = interaction.obj.x + interaction.obj.width/2;
+      const cy = interaction.obj.y + interaction.obj.depth/2;
+      interaction.obj.width = newW;
+      interaction.obj.depth = newD;
+      interaction.obj.x = cx - newW/2;
+      interaction.obj.y = cy - newD/2;
+      touch(interaction.obj);
+      requestRender(); syncProps();
+      return;
+    }
+
+    if(interaction.mode === "rotate"){
+      const center = worldToScreen(interaction.obj.x + interaction.obj.width/2, interaction.obj.y + interaction.obj.depth/2);
+      const angle = Math.atan2(sy - center.y, sx - center.x) * 180/Math.PI + 90;
+      let deg = angle;
+      if(state.snapEnabled) deg = Math.round(deg/15)*15;
+      // parallel-snap: hvis en anden synlig objekts rotation er tæt på, brug den præcist
+      const norm = ((deg % 360) + 360) % 360;
+      let best = norm, bestDiff = 5;
+      state.objects.forEach(o => {
+        if(o.id === interaction.obj.id || !objectIsInteractable(o)) return;
+        const diff = Math.min(Math.abs(o.rotation-norm), 360-Math.abs(o.rotation-norm));
+        if(diff < bestDiff){ bestDiff = diff; best = o.rotation; }
+      });
+      interaction.obj.rotation = best;
+      touch(interaction.obj);
+      requestRender(); syncProps();
+      return;
+    }
+  }
+
+  function onPointerUp(e){
+    if(interaction && interaction.mode === "pan"){ canvas.classList.remove("panning"); }
+    if(interaction){ interaction = null; activeGuides = []; render(); scheduleSave(); }
+  }
+
+  wrap.addEventListener("wheel", e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    const before = screenToWorld(sx, sy);
+
+    const factor = e.deltaY < 0 ? 1.08 : 1/1.08;
+    state.camera.zoom = clamp(state.camera.zoom * factor, 0.15, 6);
+
+    const afterScreen = worldToScreen(before.x, before.y);
+    state.camera.panX += sx - afterScreen.x;
+    state.camera.panY += sy - afterScreen.y;
+
+    requestRender(); updateStatusBar();
+  }, { passive:false });
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+  /* ---------- SMART SNAP (mod vægge/reoler, grid, og enkel equal-spacing) ---------- */
+
+  function applySmartSnap(obj, rawX, rawY){
+    if(!state.snapEnabled) return { x:rawX, y:rawY, guides:[] };
+
+    const threshold = 10 / effScale();
+    const guides = [];
+    let x = rawX, y = rawY;
+    let bestX = null, bestY = null;
+
+    const targets = state.objects.filter(o => o.id !== obj.id && objectIsInteractable(o));
+
+    targets.forEach(o => {
+      const b = getAABB(o);
+      [ [x, b.minX], [x, b.maxX], [x+obj.width, b.minX], [x+obj.width, b.maxX], [x+obj.width/2, (b.minX+b.maxX)/2] ]
+        .forEach(([cur,target]) => {
+          const diff = Math.abs(cur-target);
+          if(diff < threshold && (bestX === null || diff < bestX.diff)) bestX = { cur, target, diff };
+        });
+      [ [y, b.minY], [y, b.maxY], [y+obj.depth, b.minY], [y+obj.depth, b.maxY], [y+obj.depth/2, (b.minY+b.maxY)/2] ]
+        .forEach(([cur,target]) => {
+          const diff = Math.abs(cur-target);
+          if(diff < threshold && (bestY === null || diff < bestY.diff)) bestY = { cur, target, diff };
+        });
+    });
+
+    if(bestX){ x += (bestX.target - bestX.cur); guides.push({axis:"x", pos:bestX.target}); }
+    if(bestY){ y += (bestY.target - bestY.cur); guides.push({axis:"y", pos:bestY.target}); }
+
+    // equal-spacing (kun vandrette rækker, jf. kendte begrænsninger i testprotokol)
+    if(!bestX){
+      const eq = equalSpacingSnapX(obj, x, threshold);
+      if(eq){ x = eq.x; guides.push({axis:"x", pos:x, type:"equal", labelY: obj.y + obj.depth/2}); }
+    }
+
+    if(!bestX && !(guides.some(g=>g.axis==="x"))) x = snap(x);
+    if(!bestY) y = snap(y);
+
+    return { x, y, guides };
+  }
+
+  function equalSpacingSnapX(obj, x, threshold){
+    let leftNeighbor = null, leftGap = Infinity;
+    state.objects.forEach(o => {
+      if(o.id === obj.id || !objectIsInteractable(o)) return;
+      const ob = getAABB(o);
+      if(ob.maxX <= x + threshold){
+        const g = x - ob.maxX;
+        if(g >= 0 && g < leftGap){ leftGap = g; leftNeighbor = o; }
+      }
+    });
+    if(!leftNeighbor) return null;
+
+    const lb = getAABB(leftNeighbor);
+    let refGap = Infinity, refNeighbor = null;
+    state.objects.forEach(o => {
+      if(o.id === obj.id || o.id === leftNeighbor.id || !objectIsInteractable(o)) return;
+      const ob = getAABB(o);
+      if(ob.maxX <= lb.minX + threshold){
+        const g = lb.minX - ob.maxX;
+        if(g >= 0 && g < refGap){ refGap = g; refNeighbor = o; }
+      }
+    });
+    if(!refNeighbor) return null;
+
+    if(Math.abs(leftGap - refGap) < threshold*1.5 && Math.abs(leftGap-refGap) > 0.001){
+      return { x: lb.maxX + refGap };
+    }
+    return null;
+  }
+
+  /* =========================================================
+     7. PALETTE / DRAG & DROP (pointer-baseret, virker på touch)
+     ========================================================= */
+
+  const paletteCategories = document.getElementById("paletteCategories");
+  const ghostChip = document.getElementById("ghostChip");
+  let armedType = null;
+  let ghostFollow = false;
+
+  CATEGORIES.forEach((cat, idx) => {
+    const det = document.createElement("details");
+    det.className = "category";
+    if(idx < 2) det.open = true;
+    const summary = document.createElement("summary");
+    summary.textContent = cat.label;
+    det.appendChild(summary);
+    const body = document.createElement("div");
+    body.className = "cat-body";
+
+    OBJECT_TYPES.filter(t => t.category === cat.id).forEach(td => {
+      const el = document.createElement("div");
+      el.className = "palette-item";
+      el.dataset.type = td.type;
+      el.innerHTML = `<div class="swatch" style="background:${td.isText ? '#fff' : td.color}; border:1px solid #99a"></div>
+                       <div class="plabel">${td.label}</div>
+                       <div class="pdim">${td.w}×${td.d}m</div>`;
+      el.addEventListener("pointerdown", ev => startPaletteDrag(ev, td, el));
+      body.appendChild(el);
+    });
+    det.appendChild(body);
+    paletteCategories.appendChild(det);
+  });
+
+  function startPaletteDrag(ev, typeDef, el){
+    ev.preventDefault();
+    armPlacement(typeDef, el);
+    ghostFollow = true;
+    ghostChip.style.display = "block";
+    ghostChip.textContent = typeDef.label;
+    updateGhostPosition(ev.clientX, ev.clientY);
+
+    function onMove(e){ updateGhostPosition(e.clientX, e.clientY); }
+    function onUp(e){
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      ghostFollow = false;
+      ghostChip.style.display = "none";
+
+      const rect = canvas.getBoundingClientRect();
+      if(e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom){
+        placeArmedObject(e.clientX - rect.left, e.clientY - rect.top);
+      } else {
+        cancelPlacement();
+      }
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  function armPlacement(typeDef, el){
+    armedType = typeDef;
+    document.querySelectorAll(".palette-item").forEach(n => n.classList.remove("armed"));
+    if(el) el.classList.add("armed");
+    canvas.classList.add("placing");
+  }
+
+  function cancelPlacement(){
+    armedType = null;
+    document.querySelectorAll(".palette-item").forEach(n => n.classList.remove("armed"));
+    canvas.classList.remove("placing");
+  }
+
+  function placeArmedObject(sx, sy){
+    if(!armedType) return;
+    const world = screenToWorld(sx, sy);
+    const obj = createObject(armedType, snap(world.x - armedType.w/2), snap(world.y - armedType.d/2));
+    state.objects.push(obj);
+    cancelPlacement();
+    selectObject(obj.id, false);
+    render();
+    scheduleSave();
+  }
+
+  function updateGhostPosition(clientX, clientY){
+    ghostChip.style.left = clientX + "px";
+    ghostChip.style.top = clientY + "px";
+  }
+
+  paletteCategories.addEventListener("click", e => {
+    const item = e.target.closest(".palette-item");
+    if(!item) return;
+    const td = typeDefOf(item.dataset.type);
+    if(td && armedType !== td) armPlacement(td, item);
+  });
+
+  /* =========================================================
+     8. VALG, EGENSKABSPANEL & MÅLEVÆRKTØJ
+     ========================================================= */
+
+  function selectObject(id, additive){
+    if(!additive){
+      state.selectedIds = id ? [id] : [];
+    } else if(id){
+      const idx = state.selectedIds.indexOf(id);
+      if(idx >= 0) state.selectedIds.splice(idx,1);
+      else {
+        state.selectedIds.push(id);
+        if(state.selectedIds.length > 2) state.selectedIds.shift();
+      }
+    }
+    render();
+    syncProps();
+  }
+
+  function deleteSelected(){
+    if(!state.selectedIds.length) return;
+    state.objects = state.objects.filter(o => !state.selectedIds.includes(o.id));
+    selectObject(null, false);
+    scheduleSave();
+  }
+
+  function duplicateSelected(){
+    const obj = getSelected();
+    if(!obj) return;
+    const now = new Date().toISOString();
+    const copy = Object.assign({}, obj, {
+      id: "obj_" + Math.random().toString(36).slice(2,10),
+      x: obj.x + state.gridSize,
+      y: obj.y + state.gridSize,
+      label: obj.label,
+      name: obj.name,
+      metadata: Object.assign({}, obj.metadata),
+      created: now, modified: now
+    });
+    state.objects.push(copy);
+    selectObject(copy.id, false);
+    scheduleSave();
+  }
+
+  const propsBody = document.getElementById("propsBody");
+  const layersBody = document.getElementById("layersBody");
+
+  function syncProps(){
+    if(state.selectedIds.length === 2){
+      renderMeasurementPanel();
+    } else if(state.selectedIds.length === 1){
+      renderObjectPanel(getSelected());
+    } else {
+      propsBody.innerHTML = `<div class="empty-state">Intet objekt valgt.<br>Klik på et objekt på tegnefladen, eller træk et nyt objekt ud fra biblioteket til venstre.<br><br>Shift-klik to objekter for at få automatiske mål mellem dem.</div>`;
+    }
+    updateStatusBar();
+    if(state.activeTab === "layers") renderLayersTab();
+  }
+
+  function renderObjectPanel(obj){
+    if(!obj) return;
+    const locked = objectIsLocked(obj);
+    const layerOptions = state.layers.map(l => `<option value="${l.id}" ${obj.layer===l.id?"selected":""}>${escapeHtml(l.name)}</option>`).join("");
+
+    propsBody.innerHTML = `
+      <div class="field">
+        <label>Objektnavn</label>
+        <input type="text" id="pName" value="${escapeHtml(obj.name)}" ${locked?"disabled":""}>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>X (m)</label><input type="number" step="0.1" id="pX" value="${obj.x.toFixed(2)}" ${locked?"disabled":""}></div>
+        <div class="field"><label>Y (m)</label><input type="number" step="0.1" id="pY" value="${obj.y.toFixed(2)}" ${locked?"disabled":""}></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Bredde (m)</label><input type="number" step="0.1" min="0.05" id="pW" value="${obj.width.toFixed(2)}" ${locked?"disabled":""}></div>
+        <div class="field"><label>Dybde (m)</label><input type="number" step="0.1" min="0.05" id="pD" value="${obj.depth.toFixed(2)}" ${locked?"disabled":""}></div>
+        <div class="field"><label>Højde (m)</label><input type="number" step="0.1" min="0" id="pVH" value="${(obj.height||0).toFixed(2)}" ${locked?"disabled":""}></div>
+      </div>
+      <div class="field">
+        <label>Rotation</label>
+        <div class="rotate-row">
+          <input type="range" id="pRot" min="0" max="345" step="15" value="${obj.rotation}" ${locked?"disabled":""}>
+          <span class="rotate-value" id="pRotVal">${obj.rotation}°</span>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Farve</label><input type="color" id="pColor" value="${toHex(obj.color)}" ${locked?"disabled":""}></div>
+        <div class="field"><label>Layer</label><select id="pLayer" ${locked?"disabled":""}>${layerOptions}</select></div>
+      </div>
+      <div class="field">
+        <label>Kommentar</label>
+        <textarea id="pComment" ${locked?"disabled":""}>${escapeHtml(obj.metadata.comment||"")}</textarea>
+      </div>
+      <div class="field-row-3 field-row">
+        <div class="field"><label>Antal fag</label><input type="number" min="0" step="1" id="pBays" value="${obj.metadata.bays||0}" ${locked?"disabled":""}></div>
+        <div class="field"><label>Niveauer</label><input type="number" min="0" step="1" id="pLevels" value="${obj.metadata.levels||0}" ${locked?"disabled":""}></div>
+        <div class="field"><label>Pl./fag</label><input type="number" min="0" step="1" id="pPallets" value="${obj.metadata.palletSpacesPerBay||0}" ${locked?"disabled":""}></div>
+      </div>
+
+      <div class="prop-actions">
+        <button class="tbtn ${locked?'on':''}" id="btnLock">${locked?"🔒 Lås op":"🔓 Lås"}</button>
+        <button class="tbtn ${obj.visible?'':'on'}" id="btnHide">${obj.visible?"👁 Skjul":"🚫 Vis"}</button>
+        <button class="tbtn" id="btnDup" ${locked?"disabled":""}>Kopiér</button>
+        <button class="tbtn delete-btn" id="btnDel">Slet</button>
+      </div>
+      ${renderAnalysisReadout(obj)}
+      <div class="meta-line">
+        Type: ${obj.type} · Kategori: ${obj.category||"–"}<br>
+        ID: ${obj.id}<br>
+        Oprettet: ${formatTs(obj.created)}<br>
+        Ændret: ${formatTs(obj.modified)}
+      </div>
+    `;
+
+    function set(field, fn){
+      const el = document.getElementById(field);
+      if(!el) return;
+      el.addEventListener("input", e => { fn(e.target.value); touch(obj); render(); scheduleSave(); });
+    }
+    set("pName", v => { obj.name = v; obj.label = v; });
+    set("pX", v => { obj.x = parseFloat(v)||0; });
+    set("pY", v => { obj.y = parseFloat(v)||0; });
+    set("pW", v => { obj.width = Math.max(0.05, parseFloat(v)||0.05); });
+    set("pD", v => { obj.depth = Math.max(0.05, parseFloat(v)||0.05); });
+    set("pVH", v => { obj.height = Math.max(0, parseFloat(v)||0); });
+    set("pColor", v => { obj.color = v; });
+    set("pLayer", v => { obj.layer = v; });
+    set("pComment", v => { obj.metadata.comment = v; });
+    set("pBays", v => { obj.metadata.bays = parseInt(v,10)||0; });
+    set("pLevels", v => { obj.metadata.levels = parseInt(v,10)||0; });
+    set("pPallets", v => { obj.metadata.palletSpacesPerBay = parseInt(v,10)||0; });
+
+    const rotEl = document.getElementById("pRot");
+    if(rotEl) rotEl.addEventListener("input", e => {
+      obj.rotation = parseInt(e.target.value,10);
+      document.getElementById("pRotVal").textContent = obj.rotation + "°";
+      touch(obj); render(); scheduleSave();
+    });
+
+    const truckOverrideEl = document.getElementById("pTruckOverride");
+    if(truckOverrideEl) truckOverrideEl.addEventListener("change", e => {
+      obj.truckType = e.target.value || null;
+      touch(obj); runAnalysis(); scheduleSave();
+    });
+
+    document.getElementById("btnLock").addEventListener("click", () => { obj.locked = !obj.locked; touch(obj); render(); syncProps(); scheduleSave(); });
+    document.getElementById("btnHide").addEventListener("click", () => { obj.visible = !obj.visible; touch(obj); render(); syncProps(); scheduleSave(); });
+    document.getElementById("btnDup").addEventListener("click", duplicateSelected);
+    document.getElementById("btnDel").addEventListener("click", deleteSelected);
+  }
+
+  function renderMeasurementPanel(){
+    const a = state.objects.find(o => o.id === state.selectedIds[0]);
+    const b = state.objects.find(o => o.id === state.selectedIds[1]);
+    if(!a || !b){ propsBody.innerHTML = `<div class="empty-state">Et af de valgte objekter findes ikke længere.</div>`; return; }
+
+    const ba = getAABB(a), bb = getAABB(b);
+    const overlapY = Math.min(ba.maxY,bb.maxY) - Math.max(ba.minY,bb.minY);
+    const overlapX = Math.min(ba.maxX,bb.maxX) - Math.max(ba.minX,bb.minX);
+    const gapX = Math.max(bb.minX-ba.maxX, ba.minX-bb.maxX, 0);
+    const gapY = Math.max(bb.minY-ba.maxY, ba.minY-bb.maxY, 0);
+    const centerDist = Math.hypot(ba.cx-bb.cx, ba.cy-bb.cy);
+    let gangbredde = null;
+    if(overlapY > 0.01) gangbredde = gapX;
+    else if(overlapX > 0.01) gangbredde = gapY;
+
+    const wallA = nearestWallDistance(a);
+    const wallB = nearestWallDistance(b);
+
+    function cell(label, value){
+      return `<div class="measure-cell"><div class="mlabel">${label}</div><div class="mvalue ${value===null?'na':''}">${value===null?'Ikke relevant':value}</div></div>`;
+    }
+
+    propsBody.innerHTML = `
+      <div class="measure-pair">
+        <span class="measure-chip">${escapeHtml(a.name)}</span>
+        <span style="color:var(--text-mute)">↔</span>
+        <span class="measure-chip">${escapeHtml(b.name)}</span>
+      </div>
+      <div class="measure-grid">
+        ${cell("Afstand (center)", centerDist.toFixed(2)+" m")}
+        ${cell("Gangbredde", gangbredde===null?null:gangbredde.toFixed(2)+" m")}
+        ${cell("Fri bredde (X)", gapX.toFixed(2)+" m")}
+        ${cell("Fri længde (Y)", gapY.toFixed(2)+" m")}
+        ${cell("Afstand til væg — "+truncateName(a.name), wallA===null?null:wallA.toFixed(2)+" m")}
+        ${cell("Afstand til væg — "+truncateName(b.name), wallB===null?null:wallB.toFixed(2)+" m")}
+      </div>
+      <div class="prop-actions">
+        <button class="tbtn" id="btnClearMeasure">Ryd valg</button>
+      </div>
+      <div class="meta-line">Mål beregnes ud fra objekternes bounding box (tager højde for rotation, men er en tilnærmelse for kraftigt roterede objekter). Grafisk mållinje vises på tegnefladen når "Vis mållinjer" er aktiveret.</div>
+    `;
+    document.getElementById("btnClearMeasure").addEventListener("click", () => selectObject(null,false));
+  }
+
+  function truncateName(n){ return n.length > 14 ? n.slice(0,13)+"…" : n; }
+
+  function nearestWallDistance(obj){
+    let best = null;
+    state.objects.forEach(o => {
+      if(o.id === obj.id || o.type !== "vaeg" || !objectIsInteractable(o)) return;
+      const a = getAABB(obj), b = getAABB(o);
+      const gapX = Math.max(b.minX-a.maxX, a.minX-b.maxX, 0);
+      const gapY = Math.max(b.minY-a.maxY, a.minY-b.maxY, 0);
+      const d = (gapX>0 && gapY>0) ? Math.hypot(gapX,gapY) : Math.max(gapX,gapY);
+      if(best === null || d < best) best = d;
+    });
+    return best;
+  }
+
+  function toHex(c){
+    if(!c) return "#000000";
+    if(c.startsWith("#") && c.length === 7) return c;
+    return "#000000";
+  }
+  function formatTs(iso){
+    if(!iso) return "–";
+    try{ const d = new Date(iso); return d.toLocaleDateString("da-DK")+" "+d.toLocaleTimeString("da-DK",{hour:"2-digit",minute:"2-digit"}); }
+    catch(e){ return "–"; }
+  }
+  function escapeHtml(s){
+    return String(s==null?"":s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  /* ---------- LAYERS-FANE ---------- */
+
+  function renderLayersTab(){
+    layersBody.innerHTML = state.layers.map(l => {
+      const count = state.objects.filter(o => o.layer === l.id).length;
+      return `
+      <div class="layer-row" data-layer="${l.id}">
+        <span class="layer-swatch" style="background:${l.color}"></span>
+        <input type="text" value="${escapeHtml(l.name)}" data-action="rename">
+        <span class="layer-count">${count}</span>
+        <button class="icon-btn ${l.visible?'':'off'}" data-action="visible" title="Vis/skjul layer">${l.visible?'👁':'🚫'}</button>
+        <button class="icon-btn ${l.locked?'':'off'}" data-action="lock" title="Lås/lås op layer">${l.locked?'🔒':'🔓'}</button>
+      </div>`;
+    }).join("") + `<div class="palette-hint" style="margin-top:10px;">Objekter tildeles automatisk en layer ud fra deres kategori, når de placeres. Skjulte/låste layers gælder for alle objekter på den layer.</div>`;
+
+    layersBody.querySelectorAll(".layer-row").forEach(row => {
+      const layerId = row.dataset.layer;
+      const layer = getLayer(layerId);
+      row.querySelector('[data-action="rename"]').addEventListener("input", e => { layer.name = e.target.value; scheduleSave(); updateStatusBar(); });
+      row.querySelector('[data-action="visible"]').addEventListener("click", () => { layer.visible = !layer.visible; render(); renderLayersTab(); scheduleSave(); });
+      row.querySelector('[data-action="lock"]').addEventListener("click", () => { layer.locked = !layer.locked; render(); renderLayersTab(); scheduleSave(); });
+    });
+  }
+
+  const tabProps = document.getElementById("tabProps");
+  const tabLayers = document.getElementById("tabLayers");
+  tabProps.addEventListener("click", () => {
+    state.activeTab = "props";
+    tabProps.classList.add("active"); tabLayers.classList.remove("active"); tabAnalyse.classList.remove("active");
+    propsBody.style.display = "block"; layersBody.style.display = "none"; analyseBody.style.display = "none";
+  });
+  tabLayers.addEventListener("click", () => {
+    state.activeTab = "layers";
+    tabLayers.classList.add("active"); tabProps.classList.remove("active"); tabAnalyse.classList.remove("active");
+    propsBody.style.display = "none"; layersBody.style.display = "block"; analyseBody.style.display = "none";
+    renderLayersTab();
+  });
+
+  /* =========================================================
+     9. TOPBAR-KONTROLLER
+     ========================================================= */
+
+  document.getElementById("btnZoomIn").addEventListener("click", () => zoomBy(1.2));
+  document.getElementById("btnZoomOut").addEventListener("click", () => zoomBy(1/1.2));
+  document.getElementById("btnZoomReset").addEventListener("click", () => {
+    state.camera.zoom = 1; render(); updateStatusBar();
+  });
+  document.getElementById("btnFit").addEventListener("click", fitToObjects);
+
+  function zoomBy(factor){
+    const rect = canvas.getBoundingClientRect();
+    const cx = rect.width/2, cy = rect.height/2;
+    const before = screenToWorld(cx, cy);
+    state.camera.zoom = clamp(state.camera.zoom * factor, 0.15, 6);
+    const after = worldToScreen(before.x, before.y);
+    state.camera.panX += cx - after.x;
+    state.camera.panY += cy - after.y;
+    render(); updateStatusBar();
+  }
+
+  function fitToObjects(){
+    if(state.objects.length === 0){
+      state.camera = { panX: canvas.clientWidth/2, panY: canvas.clientHeight/2, zoom: 1 };
+      render(); updateStatusBar();
+      return;
+    }
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    state.objects.forEach(o => {
+      minX = Math.min(minX,o.x); minY = Math.min(minY,o.y);
+      maxX = Math.max(maxX,o.x+o.width); maxY = Math.max(maxY,o.y+o.depth);
+    });
+    const rect = canvas.getBoundingClientRect();
+    const pad = 60;
+    const spanX = Math.max(1, maxX-minX), spanY = Math.max(1, maxY-minY);
+    const zoomX = (rect.width - pad*2) / (spanX*PPM);
+    const zoomY = (rect.height - pad*2) / (spanY*PPM);
+    state.camera.zoom = clamp(Math.min(zoomX, zoomY), 0.15, 6);
+    const cxWorld = (minX+maxX)/2, cyWorld = (minY+maxY)/2;
+    state.camera.panX = rect.width/2 - cxWorld*effScale();
+    state.camera.panY = rect.height/2 - cyWorld*effScale();
+    render(); updateStatusBar();
+  }
+
+  document.getElementById("btnGrid").addEventListener("click", e => {
+    state.showGrid = !state.showGrid;
+    e.currentTarget.classList.toggle("active", state.showGrid);
+    render();
+  });
+  document.getElementById("btnSnap").addEventListener("click", e => {
+    state.snapEnabled = !state.snapEnabled;
+    e.currentTarget.classList.toggle("active", state.snapEnabled);
+    document.getElementById("statSnap").textContent = state.snapEnabled ? "Til" : "Fra";
+  });
+  document.getElementById("gridSizeSelect").addEventListener("change", e => {
+    state.gridSize = parseFloat(e.target.value);
+    document.getElementById("statGrid").textContent = state.gridSize + " m";
+    render(); scheduleSave();
+  });
+  document.getElementById("btnClear").addEventListener("click", () => {
+    if(state.objects.length === 0) return;
+    if(confirm("Ryd hele projektet? Alle placerede objekter slettes permanent.")){
+      state.objects = [];
+      selectObject(null, false);
+      scheduleSave();
+    }
+  });
+
+  // Vis-dropdown
+  const btnViewMenu = document.getElementById("btnViewMenu");
+  const viewMenu = document.getElementById("viewMenu");
+  btnViewMenu.addEventListener("click", e => { e.stopPropagation(); viewMenu.classList.toggle("open"); });
+  document.addEventListener("click", () => { viewMenu.classList.remove("open"); truckMenu.classList.remove("open"); });
+  viewMenu.addEventListener("click", e => e.stopPropagation());
+
+  document.getElementById("chkDims").addEventListener("change", e => { state.view.showDimensions = e.target.checked; render(); });
+  document.getElementById("chkNames").addEventListener("change", e => { state.view.showObjectNames = e.target.checked; render(); });
+  document.getElementById("chkMeasureLines").addEventListener("change", e => { state.view.showMeasureLines = e.target.checked; render(); });
+  const heatLegendEl = document.getElementById("heatLegend");
+  function updateHeatLegend(){
+    heatLegendEl.classList.toggle("show", !!(state.view.showHeatmap && state.analysis));
+  }
+  document.getElementById("chkHeatmap").addEventListener("change", e => { state.view.showHeatmap = e.target.checked; updateHeatLegend(); render(); });
+
+  function updateStatusBar(){
+    document.getElementById("statZoom").textContent = Math.round(state.camera.zoom*100) + "%";
+    document.getElementById("statCount").textContent = state.objects.length;
+    document.getElementById("statGrid").textContent = state.gridSize + " m";
+    document.getElementById("statSnap").textContent = state.snapEnabled ? "Til" : "Fra";
+
+    const sel = state.selectedIds;
+    let selText = "–";
+    if(sel.length === 1){ const o = getSelected(); selText = o ? o.name : "–"; }
+    else if(sel.length === 2) selText = "2 objekter (måling)";
+    document.getElementById("statSelected").textContent = selText;
+
+    const areas = state.analysis ? { total: state.analysis.kpi.totalArea, free: state.analysis.kpi.freeArea } : computeAreas();
+    document.getElementById("statArea").textContent = areas.total === null ? "– (tilføj vægge)" : areas.total.toFixed(1)+" m²";
+    document.getElementById("statFree").textContent = areas.free === null ? "–" : areas.free.toFixed(1)+" m²";
+  }
+
+  // Simplet areal-tilnærmelse: "samlet areal" beregnes som bounding box omkring
+  // alle Væg-objekter (approksimation, da der endnu ikke findes en egentlig
+  // rum-polygon). Uden vægge kan arealet ikke beregnes pålideligt.
+  function computeAreas(){
+    const walls = state.objects.filter(o => o.type === "vaeg");
+    if(walls.length === 0) return { total:null, free:null };
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    walls.forEach(o => {
+      const b = getAABB(o);
+      minX=Math.min(minX,b.minX); minY=Math.min(minY,b.minY);
+      maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY);
+    });
+    const total = Math.max(0,(maxX-minX)) * Math.max(0,(maxY-minY));
+    let occupied = 0;
+    state.objects.forEach(o => {
+      if(o.type === "vaeg" || o.isText || o.isArrow || o.isDimLine) return;
+      const b = getAABB(o);
+      // kun tæl med hvis inden for bounding-box'en (grov filtrering)
+      if(b.cx >= minX && b.cx <= maxX && b.cy >= minY && b.cy <= maxY){
+        occupied += o.width * o.depth;
+      }
+    });
+    return { total, free: Math.max(0, total - occupied) };
+  }
+
+  /* =========================================================
+     10. ANALYSEMOTOR (Sprint 3)
+     ========================================================= */
+
+  function getSelectedTruck(){
+    return state.truckTypes.find(t => t.id === state.selectedTruckId) || null;
+  }
+  function truckById(id){ return state.truckTypes.find(t => t.id === id) || null; }
+
+  function sumArea(list){ return list.reduce((s,o) => s + o.width*o.depth, 0); }
+  function withinRoom(obj, room){
+    const b = getAABB(obj);
+    return b.cx >= room.minX && b.cx <= room.maxX && b.cy >= room.minY && b.cy <= room.maxY;
+  }
+
+  // Kører hele analysepipelinen: pallepladser, arealer, gangbreddekontrol,
+  // regelbaserede fund og LayoutScore. Skriver resultater tilbage på de
+  // relevante objekter (rackType/palletCount/capacity/actualAisle/riskLevel/
+  // analysisFlags) samt til state.analysis til dashboard/analyse-fane.
+  function runAnalysis(){
+    const findings = [];
+    const walls = state.objects.filter(o => o.type === "vaeg");
+    let room = null;
+    if(walls.length){
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      walls.forEach(o => { const b=getAABB(o); minX=Math.min(minX,b.minX); minY=Math.min(minY,b.minY); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); });
+      room = { minX, minY, maxX, maxY };
+    }
+
+    // ---- Objekter nulstilles først, så slettede/flyttede objekter ikke bærer gamle flag ----
+    state.objects.forEach(o => { o.analysisFlags = []; });
+
+    // ---- Pallepladser ----
+    const reolObjs = state.objects.filter(o => o.category === "reoler" && o.visible !== false);
+    let totalPallets = 0;
+    const byType = {};
+    reolObjs.forEach(o => {
+      const bays = o.metadata.bays > 0 ? o.metadata.bays : Math.max(1, Math.round(o.width/0.9));
+      const levels = o.metadata.levels > 0 ? o.metadata.levels : Math.max(1, Math.round((o.height||4.5)/1.5));
+      const perBay = o.metadata.palletSpacesPerBay > 0 ? o.metadata.palletSpacesPerBay : (o.depth > 1.8 ? 2 : 1);
+      const count = bays * levels * perBay;
+      o.rackType = o.type;
+      o.palletCount = count;
+      o.capacity = count;
+      totalPallets += count;
+      byType[o.type] = (byType[o.type]||0) + count;
+    });
+
+    // ---- Arealer ----
+    const gangObjs = state.objects.filter(o => o.type === "gangareal" && o.visible !== false);
+    const bufferObjs = state.objects.filter(o => o.type === "buffer" && o.visible !== false);
+    const rackArea = sumArea(reolObjs);
+    const aisleArea = sumArea(gangObjs);
+    const bufferAreaVal = sumArea(bufferObjs);
+    const totalArea = room ? Math.max(0,(room.maxX-room.minX)) * Math.max(0,(room.maxY-room.minY)) : null;
+    const occupants = state.objects.filter(o => o.type !== "vaeg" && !o.isText && !o.isArrow && !o.isDimLine && o.visible !== false);
+    const occupiedArea = totalArea === null ? null : sumArea(occupants.filter(o => withinRoom(o, room)));
+    const freeArea = totalArea === null ? null : Math.max(0, totalArea - occupiedArea);
+    const occupancyRate = (totalArea && totalArea > 0) ? (occupiedArea/totalArea*100) : null;
+
+    // ---- Gangbreddekontrol (eksplicitte gangareal-objekter + detekterede gange mellem reolrækker) ----
+    const globalTruck = getSelectedTruck();
+    const allAisles = [];
+
+    gangObjs.forEach(o => {
+      const truckForThis = o.truckType ? truckById(o.truckType) : globalTruck;
+      const actual = Math.min(o.width, o.depth);
+      o.actualAisle = actual;
+      o.recommendedAisle = truckForThis ? truckForThis.recommendedAisle : null;
+      let level = null;
+      if(truckForThis){
+        const ratio = actual / truckForThis.recommendedAisle;
+        level = ratio >= 1 ? "green" : (ratio >= 0.85 ? "yellow" : "red");
+      }
+      o.riskLevel = level;
+      if(level && level !== "green") o.analysisFlags.push("smal_gang");
+      allAisles.push({ id:o.id, level, actual, recommended: truckForThis?truckForThis.recommendedAisle:null,
+        x:o.x+o.width/2, y:o.y+o.depth/2, refObjIds:[o.id], source:"gangareal", label:o.name });
+    });
+
+    const PAIR_SCAN_LIMIT = 400; // performance-loft — se testprotokol
+    if(globalTruck && reolObjs.length > 1 && reolObjs.length <= PAIR_SCAN_LIMIT){
+      const aabbs = reolObjs.map(getAABB); // beregnes én gang pr. objekt i stedet for pr. par
+      for(let i=0;i<reolObjs.length;i++){
+        for(let j=i+1;j<reolObjs.length;j++){
+          const a = reolObjs[i], b = reolObjs[j];
+          const ba = aabbs[i], bb = aabbs[j];
+          const overlapY = Math.min(ba.maxY,bb.maxY) - Math.max(ba.minY,bb.minY);
+          const overlapX = Math.min(ba.maxX,bb.maxX) - Math.max(ba.minX,bb.minX);
+          let gap = null, mx, my;
+          if(overlapY > 1){
+            gap = Math.max(bb.minX-ba.maxX, ba.minX-bb.maxX, 0);
+            if(gap > 0.3 && gap < 8){
+              my = (Math.max(ba.minY,bb.minY)+Math.min(ba.maxY,bb.maxY))/2;
+              mx = ba.maxX <= bb.minX ? (ba.maxX+bb.minX)/2 : (bb.maxX+ba.minX)/2;
+            } else gap = null;
+          } else if(overlapX > 1){
+            gap = Math.max(bb.minY-ba.maxY, ba.minY-bb.maxY, 0);
+            if(gap > 0.3 && gap < 8){
+              mx = (Math.max(ba.minX,bb.minX)+Math.min(ba.maxX,bb.maxX))/2;
+              my = ba.maxY <= bb.minY ? (ba.maxY+bb.minY)/2 : (bb.maxY+ba.minY)/2;
+            } else gap = null;
+          }
+          if(gap !== null){
+            const ratio = gap / globalTruck.recommendedAisle;
+            const level = ratio >= 1 ? "green" : (ratio >= 0.85 ? "yellow" : "red");
+            allAisles.push({ id:"pair_"+a.id+"_"+b.id, level, actual:gap, recommended:globalTruck.recommendedAisle,
+              x:mx, y:my, refObjIds:[a.id,b.id], source:"detected", label:a.name+" ↔ "+b.name });
+            if(level !== "green"){
+              [a,b].forEach(o => { if(!o.analysisFlags.includes("smal_gang")) o.analysisFlags.push("smal_gang"); });
+            }
+          }
+        }
+      }
+    } else if(globalTruck && reolObjs.length > PAIR_SCAN_LIMIT){
+      findings.push({ id:"pairscan_capped", type:"performance", level:"yellow",
+        message: "Automatisk gangdetektion mellem reol-par er midlertidigt begrænset ved mere end "+PAIR_SCAN_LIMIT+" reoler (performance). Eksplicitte Gangareal-objekter kontrolleres stadig fuldt ud.",
+        x:null, y:null, refObjIds:[] });
+    }
+
+    allAisles.forEach(al => {
+      if(al.level && al.level !== "green"){
+        findings.push({ id:"aisle_"+al.id, type:"gangbredde", level:al.level,
+          message: al.label+": "+al.actual.toFixed(2)+" m (anbefalet "+al.recommended.toFixed(2)+" m for valgt truck)",
+          x: al.x, y: al.y, refObjIds: al.refObjIds });
+      }
+    });
+
+    // ---- Regelbaserede fund ----
+    if(bufferObjs.length === 0 && reolObjs.length > 0){
+      findings.push({ id:"no_buffer", type:"buffer", level:"yellow", message:"Ingen buffer-område registreret i layoutet.", x:null, y:null, refObjIds:[] });
+    }
+    const safetyObjs = state.objects.filter(o => (o.type === "sikkerhed" || o.type === "flugtvej") && o.visible !== false);
+    if(safetyObjs.length === 0 && reolObjs.length > 0){
+      findings.push({ id:"no_safety", type:"sikkerhed", level:"red", message:"Ingen sikkerhedszoner eller flugtveje registreret.", x:null, y:null, refObjIds:[] });
+    }
+    const smallGang = gangObjs.filter(o => (o.width*o.depth) < 2);
+    if(smallGang.length > 3){
+      findings.push({ id:"many_small_aisles", type:"gangareal", level:"yellow",
+        message: smallGang.length+" meget små gangareal-objekter fundet — kan tyde på et fragmenteret layout.",
+        x:null, y:null, refObjIds: smallGang.map(o=>o.id) });
+    }
+
+    // ---- Store tomme områder (grid-sampling + flood fill) ----
+    const emptyRegions = [];
+    if(room){
+      const span = Math.max(room.maxX-room.minX, room.maxY-room.minY);
+      const cell = Math.max(state.gridSize, span/150);
+      const cols = Math.max(1, Math.ceil((room.maxX-room.minX)/cell));
+      const rows = Math.max(1, Math.ceil((room.maxY-room.minY)/cell));
+      if(cols*rows > 0 && cols*rows <= 40000){
+        const occ = new Uint8Array(cols*rows);
+        occupants.forEach(o => {
+          const b = getAABB(o);
+          const c0 = Math.max(0, Math.floor((b.minX-room.minX)/cell)), c1 = Math.min(cols-1, Math.floor((b.maxX-room.minX)/cell));
+          const r0 = Math.max(0, Math.floor((b.minY-room.minY)/cell)), r1 = Math.min(rows-1, Math.floor((b.maxY-room.minY)/cell));
+          for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) occ[r*cols+c]=1;
+        });
+        const visited = new Uint8Array(cols*rows);
+        for(let r=0;r<rows;r++){
+          for(let c=0;c<cols;c++){
+            const idx = r*cols+c;
+            if(occ[idx] || visited[idx]) continue;
+            let stackX=[c], stackY=[r], count=0, sumX=0, sumY=0;
+            visited[idx]=1;
+            while(stackX.length){
+              const cx=stackX.pop(), cy=stackY.pop();
+              count++; sumX+=cx; sumY+=cy;
+              [[cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]].forEach(([nx,ny]) => {
+                if(nx<0||ny<0||nx>=cols||ny>=rows) return;
+                const nidx = ny*cols+nx;
+                if(!occ[nidx] && !visited[nidx]){ visited[nidx]=1; stackX.push(nx); stackY.push(ny); }
+              });
+            }
+            const areaM2 = count*cell*cell;
+            if(areaM2 > 25){
+              emptyRegions.push({ areaM2, x: room.minX+(sumX/count+0.5)*cell, y: room.minY+(sumY/count+0.5)*cell });
+            }
+          }
+        }
+      }
+    }
+    emptyRegions.forEach((r,i) => {
+      findings.push({ id:"empty_"+i, type:"tomt_omraade", level:"yellow", message:"Stort tomt område: ca. "+r.areaM2.toFixed(0)+" m².", x:r.x, y:r.y, refObjIds:[] });
+    });
+
+    // ---- Døde zoner: funktionsområder langt fra nærmeste gang/port/dør ----
+    const accessObjs = state.objects.filter(o => ["gangareal","port","dor"].includes(o.type) && o.visible !== false);
+    const funcObjs = state.objects.filter(o => o.category === "lager" && o.visible !== false);
+    if(accessObjs.length){
+      funcObjs.forEach(o => {
+        let best = Infinity;
+        const oa = getAABB(o);
+        accessObjs.forEach(ac => {
+          const ab = getAABB(ac);
+          const gapX = Math.max(ab.minX-oa.maxX, oa.minX-ab.maxX, 0);
+          const gapY = Math.max(ab.minY-oa.maxY, oa.minY-ab.maxY, 0);
+          const d = (gapX>0 && gapY>0) ? Math.hypot(gapX,gapY) : Math.max(gapX,gapY);
+          if(d < best) best = d;
+        });
+        const threshold = globalTruck ? globalTruck.recommendedAisle*3 : 8;
+        if(best > threshold){
+          findings.push({ id:"dead_"+o.id, type:"dod_zone", level:"yellow",
+            message: '"'+o.name+'" virker isoleret ('+best.toFixed(1)+' m til nærmeste gang/port).',
+            x: oa.cx, y: oa.cy, refObjIds:[o.id] });
+          if(!o.analysisFlags.includes("isoleret")) o.analysisFlags.push("isoleret");
+        }
+      });
+    }
+
+    // ---- KPI ----
+    const kpi = {
+      objectCount: state.objects.length,
+      palletCount: totalPallets,
+      rackMeters: reolObjs.reduce((s,o)=>s+o.width,0),
+      aisleCount: allAisles.length,
+      criticalAisles: allAisles.filter(a=>a.level==="red").length,
+      rackCount: reolObjs.length,
+      totalArea, freeArea, occupancyRate, rackArea, aisleArea, bufferArea: bufferAreaVal
+    };
+
+    const score = computeLayoutScore({ kpi, reolObjs, allAisles, safetyObjs, truck: globalTruck });
+
+    state.analysis = { findings, kpi, byType, score, room, allAisles, truck: globalTruck, timestamp: new Date().toISOString() };
+    state.analysis.recommendations = generateRecommendations(state.analysis);
+
+    renderDashboard();
+    renderScoreCards();
+    updateHeatLegend();
+    if(state.activeTab === "analyse") renderAnalyseTab();
+    if(state.selectedIds.length === 1) syncProps();
+    requestAnimationFrame(resizeCanvas); // dashboard-højden kan ændre sig (fx første analyse) — hold canvas i sync
+  }
+
+  // Optimeringsscore 0-100 — regelbaseret V1-heuristik, ikke en valideret
+  // driftsmæssig model. Metoden er dokumenteret i testprotokollen.
+  function computeLayoutScore({ kpi, reolObjs, allAisles, safetyObjs, truck }){
+    let utilScore = null;
+    if(kpi.occupancyRate != null){
+      utilScore = Math.max(0, 100 - Math.abs(70 - kpi.occupancyRate)*1.8);
+    }
+    let aisleScore = null;
+    if(truck && allAisles.length){
+      const sum = allAisles.reduce((s,a) => s + (a.level==="green"?100:a.level==="yellow"?55:0), 0);
+      aisleScore = sum / allAisles.length;
+    }
+    let flowScore = null;
+    if(truck){
+      const ratio = reolObjs.length > 0 ? (allAisles.length / Math.max(1, reolObjs.length/4)) : 1;
+      const ratioScore = Math.max(0, Math.min(100, ratio*100));
+      flowScore = aisleScore != null ? (ratioScore*0.4 + aisleScore*0.6) : ratioScore;
+    }
+    let safetyScore = 40;
+    if(safetyObjs.length > 0){
+      const benchmark = kpi.totalArea ? Math.max(1, kpi.totalArea/250) : 1;
+      safetyScore = Math.max(40, Math.min(100, (safetyObjs.length/benchmark)*100));
+    }
+    const parts = [utilScore, aisleScore, flowScore, safetyScore].filter(v => v != null);
+    const overall = parts.length ? parts.reduce((a,b)=>a+b,0)/parts.length : null;
+    const r = v => v==null ? null : Math.round(v);
+    return { utilization:r(utilScore), aisles:r(aisleScore), flow:r(flowScore), safety:r(safetyScore), overall:r(overall) };
+  }
+
+  /* ---------------------------------------------------------
+     SPRINT 4 — Dashboard 2.0, Heatmap, Rapportkort, Forslag
+     Bygger udelukkende ovenpå state.analysis fra Sprint 3's
+     runAnalysis()/computeLayoutScore() — ingen af de funktioner
+     er ændret, kun udvidet med to nye kald (se runAnalysis).
+     --------------------------------------------------------- */
+
+  // ---- Status-klassificering (delt af scorekort + rapportkort) ----
+  function scoreStatus(v){
+    if(v == null) return "neutral";
+    if(v >= 80) return "green";
+    if(v >= 50) return "yellow";
+    if(v >= 35) return "orange";
+    return "red";
+  }
+  function scoreRecommendationLabel(v){
+    if(v == null) return "Ikke beregnet";
+    if(v >= 80) return "God";
+    if(v >= 50) return "Acceptabel";
+    return "Kræver handling";
+  }
+  function riskLevelFromScore(overall, findings){
+    const hasCriticalSafety = findings.some(f => f.type==="sikkerhed" && f.level==="red");
+    const hasCriticalAisle = findings.some(f => f.type==="gangbredde" && f.level==="red");
+    let base;
+    if(overall == null) base = "neutral";
+    else if(overall >= 80) base = "green";
+    else if(overall >= 60) base = "yellow";
+    else if(overall >= 40) base = "orange";
+    else base = "red";
+    // sikkerheds- og kritiske gangbredde-fund kan aldrig "underdrive" risikoniveauet
+    const order = ["green","yellow","orange","red"];
+    if(hasCriticalSafety && order.indexOf(base) < order.indexOf("red")) base = "orange";
+    if(hasCriticalAisle && order.indexOf(base) < order.indexOf("orange")) base = "orange";
+    const labels = { green:"Lav risiko", yellow:"Moderat risiko", orange:"Høj risiko", red:"Kritisk risiko", neutral:"Ikke vurderet" };
+    return { level: base, label: labels[base] };
+  }
+
+  // ---- Dashboard 2.0: fem store, farvede scorekort med trendpil ----
+  const TREND_ICON = { up:"▲", down:"▼", flat:"—" };
+  function trendFor(current, previous){
+    if(current == null || previous == null) return { dir:"flat", delta:null };
+    const delta = current - previous;
+    if(Math.abs(delta) < 1) return { dir:"flat", delta };
+    return { dir: delta > 0 ? "up" : "down", delta };
+  }
+
+  const scoreCardsEl = document.getElementById("scoreCards");
+  function scoreCardHtml(icon, label, value, unit, baselineValue){
+    const status = scoreStatus(value);
+    const trend = trendFor(value, baselineValue);
+    const trendCls = value==null ? "flat" : trend.dir;
+    const trendTxt = value==null ? "Ingen data" : (trend.delta==null ? "vs. sidst: —" : (trend.delta>=0?"+":"")+Math.round(trend.delta)+" vs. sidst");
+    return '<div class="scard s-'+status+'">'
+      + '<div class="scard-head"><span class="scard-icon">'+icon+'</span>'
+      + '<span class="scard-trend '+trendCls+'">'+TREND_ICON[trendCls]+' '+trendTxt+'</span></div>'
+      + '<div class="scard-value">'+(value==null?"–":value)+(value!=null&&unit?'<span class="unit">'+unit+'</span>':'')+'</div>'
+      + '<div class="scard-label">'+label+'</div>'
+      + '<span class="scard-chip s-'+status+'">'+scoreRecommendationLabel(value)+'</span>'
+      + '</div>';
+  }
+  function renderScoreCards(){
+    if(!state.analysis){ scoreCardsEl.innerHTML = ""; return; }
+    const s = state.analysis.score;
+    const b = state.sessionStartScore || {};
+    scoreCardsEl.innerHTML =
+        scoreCardHtml("🏆", "LayoutScore", s.overall, "/100", b.overall)
+      + scoreCardHtml("📦", "Udnyttelse", s.utilization, "/100", b.utilization)
+      + scoreCardHtml("🚦", "Flow", s.flow, "/100", b.flow)
+      + scoreCardHtml("🛡️", "Sikkerhed", s.safety, "/100", b.safety)
+      + scoreCardHtml("🚛", "Truck-egnethed", s.aisles, "/100", b.aisles);
+  }
+
+  // ---- Heatmap: farvede zoner ovenpå layoutet baseret på fundene fra analysen ----
+  function heatRgb(level){
+    return { green:"58,157,93", yellow:"225,167,60", orange:"230,126,34", red:"192,57,43", purple:"142,124,195" }[level] || "150,150,150";
+  }
+  function median(arr){
+    if(!arr.length) return 0;
+    const s = arr.slice().sort((a,b)=>a-b);
+    const mid = Math.floor(s.length/2);
+    return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
+  }
+  function drawHeatBlob(x, y, radiusM, level, alpha){
+    const p = worldToScreen(x,y);
+    const r = clamp(radiusM*effScale(), 14, 170);
+    const grad = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+    grad.addColorStop(0, "rgba("+heatRgb(level)+","+(alpha||0.5)+")");
+    grad.addColorStop(1, "rgba("+heatRgb(level)+",0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fill();
+  }
+  function drawHeatmap(){
+    const an = state.analysis;
+    ctx.save();
+
+    // helt lager-bredt "wash" hvis der slet ikke er sikkerhedszoner/flugtveje
+    if(an.room && an.findings.some(f => f.id==="no_safety")){
+      const p1 = worldToScreen(an.room.minX, an.room.minY);
+      const p2 = worldToScreen(an.room.maxX, an.room.maxY);
+      ctx.fillStyle = "rgba(192,57,43,0.06)";
+      ctx.fillRect(p1.x, p1.y, p2.x-p1.x, p2.y-p1.y);
+    }
+
+    // gangbredder — grøn/gul/orange/rød/lilla (lilla = flaskehals: markant smallere end resten)
+    const widths = an.allAisles.filter(a=>a.level).map(a=>a.actual);
+    const med = median(widths);
+    an.allAisles.forEach(a => {
+      if(!a.level || a.level === "green") return;
+      const ratio = a.actual / a.recommended;
+      let heat = ratio>=0.85 ? "yellow" : ratio>=0.6 ? "orange" : "red";
+      if(heat === "red" && med > 0 && a.actual <= med*0.5) heat = "purple"; // flaskehals
+      drawHeatBlob(a.x, a.y, Math.max(1.5, a.actual*1.3), heat, 0.5);
+    });
+
+    // store tomme områder — intensitet skalerer med størrelse
+    an.findings.filter(f => f.type==="tomt_omraade" && f.x!=null).forEach(f => {
+      const areaMatch = /ca\. (\d+)/.exec(f.message);
+      const area = areaMatch ? parseInt(areaMatch[1],10) : 30;
+      const heat = area>200 ? "red" : area>80 ? "orange" : "yellow";
+      drawHeatBlob(f.x, f.y, Math.sqrt(area/Math.PI)*0.9, heat, 0.4);
+    });
+
+    // døde zoner — altid lilla, jf. tidligere markørfarve i Sprint 3
+    an.findings.filter(f => f.type==="dod_zone" && f.x!=null).forEach(f => {
+      drawHeatBlob(f.x, f.y, 2.5, "purple", 0.45);
+    });
+
+    ctx.restore();
+  }
+
+  // ---- Automatiske forbedringsforslag (regelbaserede — IKKE en AI-model) ----
+  // Genererer op til 10 konkrete, prioriterede forslag ud fra de faktiske fund.
+  // Der pumpes bevidst ikke fyldforslag ind for at nå op på 10, hvis der ikke
+  // er reelt grundlag — se testprotokollen.
+  function generateRecommendations(an){
+    const recs = [];
+    const sevOrder = { red:0, orange:1, yellow:2, info:3 };
+
+    an.findings.forEach(f => {
+      if(f.type === "gangbredde"){
+        const isPair = f.refObjIds && f.refObjIds.length === 2;
+        const objA = f.refObjIds && state.objects.find(o=>o.id===f.refObjIds[0]);
+        const text = isPair
+          ? "Flyt \""+ (objA?objA.name:"reol") +"\" (eller nabo-reolen) for at øge gangbredden — "+f.message.split(": ")[1]
+          : "Udvid \""+(objA?objA.name:"gangareal")+"\" — "+f.message.split(": ")[1];
+        const impact = "Forbedrer truck-fremkommelighed og reducerer risiko for kø/skader i gangen.";
+        recs.push({ id:"rec_"+f.id, severity:f.level, text, impact, x:f.x, y:f.y, refObjIds:f.refObjIds });
+      } else if(f.id === "no_buffer"){
+        recs.push({ id:"rec_buffer", severity:"yellow", text:"Tilføj en bufferzone tæt på reolområdet.",
+          impact:"Reducerer flaskehalse ved modtagelse/afsendelse og glatter pukler i plukflowet.", x:null, y:null, refObjIds:[] });
+      } else if(f.id === "no_safety"){
+        recs.push({ id:"rec_safety", severity:"red", text:"Tilføj mindst én sikkerhedszone og en markeret flugtvej.",
+          impact:"Nødvendigt for at leve op til grundlæggende sikkerhedskrav i lagerlayoutet.", x:null, y:null, refObjIds:[] });
+      } else if(f.id === "many_small_aisles"){
+        recs.push({ id:"rec_smallaisles", severity:"yellow",
+          text:"Saml de "+(f.refObjIds.length)+" små gangareal-objekter til færre, bredere gange.",
+          impact:"Et mere sammenhængende gangnet er lettere at navigere og reducerer krydsende trafik.", x:null, y:null, refObjIds:f.refObjIds });
+      } else if(f.type === "tomt_omraade"){
+        const areaMatch = /ca\. (\d+)/.exec(f.message);
+        const area = areaMatch ? parseInt(areaMatch[1],10) : 30;
+        const estPallets = Math.max(1, Math.floor(area*0.6/2.97*3));
+        recs.push({ id:"rec_"+f.id, severity: area>200?"orange":"yellow",
+          text:"Udnyt det tomme område (~"+area+" m²) til yderligere reoler.",
+          impact:"Estimeret potentiale: op til ~"+estPallets+" ekstra pallepladser (grov tommelfingerregel).", x:f.x, y:f.y, refObjIds:[] });
+      } else if(f.type === "dod_zone"){
+        recs.push({ id:"rec_"+f.id, severity:"yellow", text:f.message.replace("virker isoleret","bør flyttes tættere på et gangareal eller en port"),
+          impact:"Reducerer transporttid og gør zonen lettere tilgængelig i den daglige drift.", x:f.x, y:f.y, refObjIds:f.refObjIds });
+      }
+    });
+
+    if(an.kpi.occupancyRate != null){
+      if(an.kpi.occupancyRate < 40 && an.kpi.rackCount > 0){
+        recs.push({ id:"rec_lowutil", severity:"yellow",
+          text:"Lagerudnyttelsen er lav ("+an.kpi.occupancyRate.toFixed(0)+"%) — overvej et mindre areal eller flere reoler.",
+          impact:"Bedre arealøkonomi uden at gå på kompromis med gangbredder.", x:null, y:null, refObjIds:[] });
+      } else if(an.kpi.occupancyRate > 90){
+        recs.push({ id:"rec_highutil", severity:"orange",
+          text:"Lagerudnyttelsen er meget høj ("+an.kpi.occupancyRate.toFixed(0)+"%) — undersøg plads til fremtidig vækst.",
+          impact:"Høj udnyttelse i dag kan blive en flaskehals ved fremtidig kapacitetsudvidelse.", x:null, y:null, refObjIds:[] });
+      }
+    }
+
+    recs.sort((a,b) => (sevOrder[a.severity]??3) - (sevOrder[b.severity]??3));
+    return recs.slice(0, 10);
+  }
+
+  // Objekt-specifik analyse-visning i Egenskaber-panelet: pallepladser for
+  // reoler, gangbreddekontrol-resultat for gangareal-objekter.
+  function renderAnalysisReadout(obj){
+    if(obj.category === "reoler"){
+      return '<div class="section-divider">Analyse — pallepladser</div>'
+        + '<div class="measure-grid">'
+        + '<div class="measure-cell"><div class="mlabel">Fag × niveauer × pl./fag</div><div class="mvalue" style="font-size:12px;">'
+          + (obj.metadata.bays||"auto") + " × " + (obj.metadata.levels||"auto") + " × " + (obj.metadata.palletSpacesPerBay||"auto") + '</div></div>'
+        + '<div class="measure-cell"><div class="mlabel">Pallepladser (beregnet)</div><div class="mvalue">' + (obj.palletCount==null ? "–" : obj.palletCount) + '</div></div>'
+        + '</div>'
+        + '<div class="meta-line">Udfyld Antal fag/Niveauer/Pl. pr. fag ovenfor for at overstyre den automatiske beregning.</div>';
+    }
+    if(obj.type === "gangareal"){
+      const truckOptions = ['<option value="">Global valgt truck</option>']
+        .concat(state.truckTypes.map(t => '<option value="'+t.id+'" '+(obj.truckType===t.id?"selected":"")+'>'+escapeHtml(t.name)+'</option>')).join("");
+      const levelLabel = obj.riskLevel==="red" ? "🔴 Kritisk" : obj.riskLevel==="yellow" ? "🟡 Bør undersøges" : obj.riskLevel==="green" ? "🟢 OK" : "– (vælg en truck)";
+      return '<div class="section-divider">Analyse — gangbreddekontrol</div>'
+        + '<div class="field"><label>Truck-override for denne gang</label><select id="pTruckOverride">'+truckOptions+'</select></div>'
+        + '<div class="measure-grid">'
+        + '<div class="measure-cell"><div class="mlabel">Aktuel bredde</div><div class="mvalue">' + (obj.actualAisle==null?"–":obj.actualAisle.toFixed(2)+" m") + '</div></div>'
+        + '<div class="measure-cell"><div class="mlabel">Anbefalet</div><div class="mvalue">' + (obj.recommendedAisle==null?"–":obj.recommendedAisle.toFixed(2)+" m") + '</div></div>'
+        + '</div>'
+        + '<div class="meta-line">Status: '+levelLabel+'</div>';
+    }
+    return "";
+  }
+
+  function drawAnalysisOverlays(){
+    const colors = { green:"#3A9D5D", yellow:"#E1A73C", red:"#C0392B" };
+    (state.analysis.allAisles||[]).forEach(a => {
+      if(!a.level) return;
+      const p = worldToScreen(a.x, a.y);
+      ctx.save();
+      ctx.fillStyle = colors[a.level];
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    });
+    state.analysis.findings.filter(f => (f.type==="tomt_omraade" || f.type==="dod_zone") && f.x!=null).forEach(f => {
+      const p = worldToScreen(f.x, f.y);
+      ctx.save();
+      ctx.fillStyle = f.type==="tomt_omraade" ? "rgba(225,167,60,0.9)" : "rgba(142,124,195,0.9)";
+      ctx.beginPath(); ctx.moveTo(p.x,p.y-9); ctx.lineTo(p.x+8,p.y+7); ctx.lineTo(p.x-8,p.y+7); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle="#fff"; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle="#fff"; ctx.font="bold 10px -apple-system, sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("!", p.x, p.y+2);
+      ctx.restore();
+    });
+  }
+
+  function zoomToFinding(f){
+    let x = f.x, y = f.y;
+    if((x==null || y==null) && f.refObjIds && f.refObjIds.length){
+      const o = state.objects.find(ob => ob.id === f.refObjIds[0]);
+      if(o){ const b = getAABB(o); x = b.cx; y = b.cy; }
+    }
+    if(x == null || y == null) return;
+    const rect = canvas.getBoundingClientRect();
+    state.camera.zoom = clamp(Math.max(state.camera.zoom, 1.3), 0.15, 6);
+    state.camera.panX = rect.width/2 - x*effScale();
+    state.camera.panY = rect.height/2 - y*effScale();
+    if(f.refObjIds && f.refObjIds.length === 1) selectObject(f.refObjIds[0], false);
+    else render();
+  }
+
+  function kpiCard(label, value, cls){
+    return '<div class="kpi-card'+(cls?" "+cls:"")+'"><div class="kval">'+value+'</div><div class="klabel">'+label+'</div></div>';
+  }
+  function scoreBarColor(v){ if(v==null) return "#5B6B7A"; return v>=75 ? "#3A9D5D" : (v>=50 ? "#E1A73C" : "#C0392B"); }
+  function scoreBar(label, v){
+    const val = v==null ? 0 : v;
+    const disp = v==null ? "–" : v;
+    return '<div class="score-bar-item"><div class="sblabel">'+label+'</div>'
+      +'<div class="score-bar-track"><div class="score-bar-fill" style="width:'+val+'%; background:'+scoreBarColor(v)+'"></div></div>'
+      +'<div class="sbval" style="color:'+scoreBarColor(v)+'">'+disp+'</div></div>';
+  }
+
+  const dashboardEl = document.getElementById("dashboard");
+  function renderDashboard(){
+    if(!state.analysis){ dashboardEl.innerHTML = '<div style="font-size:12px;color:var(--text-mute);align-self:center;">Analyse kører …</div>'; return; }
+    const k = state.analysis.kpi;
+    const s = state.analysis.score;
+    let html = "";
+    html += kpiCard("Objekter", k.objectCount);
+    html += kpiCard("Pallepladser", k.palletCount.toLocaleString("da-DK"));
+    html += kpiCard("Reolmeter", k.rackMeters.toFixed(1)+" m");
+    html += kpiCard("Antal reoler", k.rackCount);
+    html += kpiCard("Truckgange", k.aisleCount);
+    html += kpiCard("Kritiske gangbredder", k.criticalAisles, k.criticalAisles>0 ? "danger" : "");
+    html += kpiCard("Udnyttelsesgrad", k.occupancyRate==null ? "–" : k.occupancyRate.toFixed(0)+"%");
+    html += kpiCard("Areal", k.totalArea==null ? "–" : k.totalArea.toFixed(0)+" m²");
+    html += kpiCard("Ledigt areal", k.freeArea==null ? "–" : k.freeArea.toFixed(0)+" m²");
+
+    html += '<div class="score-cluster">'
+      + '<div class="score-overall"><div class="sval">'+(s.overall==null?"–":s.overall)+'</div><div class="slabel">LayoutScore</div></div>'
+      + '<div class="score-bars">'
+      + scoreBar("Udnyt.", s.utilization)
+      + scoreBar("Flow", s.flow)
+      + scoreBar("Gange", s.aisles)
+      + scoreBar("Sikkerhed", s.safety)
+      + '</div></div>';
+
+    dashboardEl.innerHTML = html;
+  }
+
+  const analyseBody = document.getElementById("analyseBody");
+  function renderAnalyseTab(){
+    if(!state.analysis){ analyseBody.innerHTML = '<div class="empty-state">Analyse kører …</div>'; return; }
+    const f = state.analysis.findings;
+    const truck = state.analysis.truck;
+    const risk = riskLevelFromScore(state.analysis.score.overall, f);
+    const recs = state.analysis.recommendations || [];
+
+    let html = '<div class="reportcard">'
+      + '<div class="reportcard-top">'
+      + '<div class="reportcard-score">'+(state.analysis.score.overall==null?"–":state.analysis.score.overall)+'<span class="unit">/100</span></div>'
+      + '<div><span class="reportcard-risk s-'+risk.level+'">'+risk.label+'</span></div>'
+      + '</div>'
+      + '<div class="reportcard-summary">'
+      + (recs.length ? recs.length+' forbedringsforslag fundet — top-prioritet: "'+escapeHtml(recs[0].text)+'"' : 'Ingen forbedringsforslag fundet ud fra de nuværende regler.')
+      + '</div></div>';
+
+    html += '<div class="props-title">Fund ('+f.length+')</div>';
+    if(!truck){
+      html += '<div class="palette-hint">Vælg en truck under "Trucks ▾" i topbaren for at aktivere gangbreddekontrol.</div>';
+    }
+    if(f.length === 0){
+      html += '<div class="empty-state">Ingen fund — layoutet ser fornuftigt ud ud fra de nuværende regler.</div>';
+    } else {
+      f.forEach(item => {
+        const dotClass = item.level === "red" ? "red" : (item.level === "yellow" ? "yellow" : "info");
+        const clickable = item.x != null || (item.refObjIds && item.refObjIds.length);
+        html += '<div class="finding-row'+(clickable?"":" nozoom")+'" data-id="'+item.id+'">'
+          + '<span class="finding-dot '+dotClass+'"></span>'
+          + '<span class="finding-text"><span class="finding-type">'+item.type+'</span>'+escapeHtml(item.message)+'</span>'
+          + '</div>';
+      });
+    }
+
+    html += '<div class="section-divider">Forbedringsforslag ('+recs.length+')</div>';
+    if(recs.length === 0){
+      html += '<div class="empty-state">Ingen konkrete forslag pt. — layoutet giver ikke anledning til handling ud fra de nuværende regler.</div>';
+    } else {
+      recs.forEach((r,i) => {
+        const clickable = r.x != null || (r.refObjIds && r.refObjIds.length);
+        html += '<div class="rec-row'+(clickable?"":" nozoom")+'" data-recid="'+r.id+'">'
+          + '<span class="rec-num">'+(i+1)+'</span>'
+          + '<span><span class="rec-text">'+escapeHtml(r.text)+'</span><div class="rec-impact">'+escapeHtml(r.impact)+'</div></span>'
+          + '</div>';
+      });
+    }
+
+    html += '<div class="section-divider">LayoutScore-metode</div>'
+      + '<div class="meta-line">Udnyttelse måles mod et ideelt niveau på ~70% belægning. Gangbredder/Flow kræver en valgt truck. Sikkerhed vurderes ud fra antal sikkerhedszoner/flugtveje ift. arealet. Dette er en regelbaseret V1-model, ikke en valideret driftsberegning. Forbedringsforslagene er ligeledes regelbaserede — ikke genereret af en AI-model.</div>';
+    analyseBody.innerHTML = html;
+
+    analyseBody.querySelectorAll(".finding-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const item = f.find(x => x.id === row.dataset.id);
+        if(item) zoomToFinding(item);
+      });
+    });
+
+    analyseBody.querySelectorAll(".rec-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const item = recs.find(x => x.id === row.dataset.recid);
+        if(item) zoomToFinding(item);
+      });
+    });
+  }
+
+  // ---- Trucks-dropdown ----
+  const btnTruckMenu = document.getElementById("btnTruckMenu");
+  const truckMenu = document.getElementById("truckMenu");
+  const truckSelect = document.getElementById("truckSelect");
+  const truckSpecBox = document.getElementById("truckSpecBox");
+
+  function populateTruckSelect(){
+    const opts = ['<option value="">— Ingen valgt —</option>']
+      .concat(state.truckTypes.map(t => '<option value="'+t.id+'" '+(t.id===state.selectedTruckId?"selected":"")+'>'+escapeHtml(t.name)+(t.builtin?"":" (brugerdefineret)")+'</option>'));
+    truckSelect.innerHTML = opts.join("");
+    renderTruckSpecBox();
+  }
+  function renderTruckSpecBox(){
+    const t = getSelectedTruck();
+    if(!t){ truckSpecBox.innerHTML = "Ingen truck valgt — gangbreddekontrol er inaktiv."; return; }
+    truckSpecBox.innerHTML =
+      "Bredde: <b>"+t.width.toFixed(2)+" m</b> · Længde: <b>"+t.length.toFixed(2)+" m</b><br>"
+      + "Frihøjde: <b>"+t.freeHeight.toFixed(2)+" m</b> · Vendecirkel: <b>"+t.turningRadius.toFixed(2)+" m</b><br>"
+      + "Anbefalet gangbredde: <b>"+t.recommendedAisle.toFixed(2)+" m</b><br>"
+      + "Maks løftehøjde: <b>"+t.maxLiftHeight.toFixed(2)+" m</b>";
+  }
+  btnTruckMenu.addEventListener("click", e => { e.stopPropagation(); truckMenu.classList.toggle("open"); });
+  truckMenu.addEventListener("click", e => e.stopPropagation());
+  truckSelect.addEventListener("change", e => {
+    state.selectedTruckId = e.target.value || null;
+    renderTruckSpecBox();
+    runAnalysis();
+    scheduleSave();
+  });
+  document.getElementById("btnAddTruck").addEventListener("click", () => {
+    const form = document.getElementById("addTruckForm");
+    form.style.display = form.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("btnSaveTruck").addEventListener("click", () => {
+    const name = document.getElementById("ntName").value.trim();
+    if(!name){ alert("Angiv et navn til trucken."); return; }
+    const t = {
+      id: "custom_" + Math.random().toString(36).slice(2,10),
+      name,
+      width: parseFloat(document.getElementById("ntWidth").value)||1.0,
+      length: parseFloat(document.getElementById("ntLength").value)||2.0,
+      freeHeight: parseFloat(document.getElementById("ntFreeHeight").value)||0.1,
+      turningRadius: parseFloat(document.getElementById("ntTurning").value)||2.0,
+      recommendedAisle: parseFloat(document.getElementById("ntAisle").value)||2.5,
+      maxLiftHeight: parseFloat(document.getElementById("ntMaxLift").value)||5.0,
+      builtin: false
+    };
+    state.truckTypes.push(t);
+    state.selectedTruckId = t.id;
+    document.getElementById("addTruckForm").style.display = "none";
+    document.getElementById("ntName").value = "";
+    populateTruckSelect();
+    runAnalysis();
+    scheduleSave();
+  });
+
+  // ---- Analyse-fane (tredje faneblad) ----
+  const tabAnalyse = document.getElementById("tabAnalyse");
+  tabAnalyse.addEventListener("click", () => {
+    state.activeTab = "analyse";
+    tabAnalyse.classList.add("active"); tabProps.classList.remove("active"); tabLayers.classList.remove("active");
+    propsBody.style.display = "none"; layersBody.style.display = "none"; analyseBody.style.display = "block";
+    renderAnalyseTab();
+  });
+
+  /* =========================================================
+     11. PERSISTENS (localStorage)
+     ========================================================= */
+
+  let saveTimer = null;
+  let analysisTimer = null;
+  function scheduleSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveProject, 300);
+    clearTimeout(analysisTimer);
+    analysisTimer = setTimeout(runAnalysis, 400);
+    updateStatusBar();
+  }
+  function saveProject(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        objects: state.objects,
+        camera: state.camera,
+        gridSize: state.gridSize,
+        layers: state.layers,
+        view: state.view,
+        truckTypes: state.truckTypes,
+        selectedTruckId: state.selectedTruckId,
+        lastKnownScore: state.analysis ? state.analysis.score : state.sessionStartScore,
+        reportSettings: state.reportSettings,
+        reportHistory: state.reportHistory
+      }));
+    }catch(err){ console.warn("Kunne ikke gemme projekt lokalt:", err); }
+  }
+
+  // Migrerer objekter gemt af Sprint 1 (som brugte "height" som footprint-dybde
+  // og manglede category/depth/locked/visible/created/modified) til Sprint 2-modellen.
+  function migrateObject(o){
+    if(o.depth === undefined){
+      o.depth = (o.height !== undefined && typeof o.height === "number") ? o.height : 1;
+    }
+    const td = typeDefOf(o.type);
+    if(o.height === undefined || o.category === undefined){
+      o.height = td ? td.vh : 2.5;
+    }
+    if(o.category === undefined) o.category = td ? td.category : "bygning";
+    if(o.layer === undefined || o.layer === 0 || typeof o.layer === "number") o.layer = layerForType(td) ;
+    if(o.name === undefined) o.name = o.label || (td ? td.label : o.type);
+    if(o.locked === undefined) o.locked = false;
+    if(o.visible === undefined) o.visible = true;
+    if(!o.created) o.created = new Date().toISOString();
+    if(!o.modified) o.modified = o.created;
+    if(!o.metadata || typeof o.metadata !== "object") o.metadata = {};
+    if(o.metadata.comment === undefined) o.metadata.comment = "";
+    if(o.metadata.bays === undefined) o.metadata.bays = 0;
+    if(o.metadata.levels === undefined) o.metadata.levels = 0;
+    if(o.metadata.palletSpacesPerBay === undefined) o.metadata.palletSpacesPerBay = 0;
+    if(o.isArrow === undefined) o.isArrow = false;
+    if(o.isDimLine === undefined) o.isDimLine = false;
+    // Sprint 3-felter — udfyldes reelt af runAnalysis(), her sikres blot at nøglerne findes
+    if(o.truckType === undefined) o.truckType = null;
+    if(o.recommendedAisle === undefined) o.recommendedAisle = null;
+    if(o.actualAisle === undefined) o.actualAisle = null;
+    if(o.capacity === undefined) o.capacity = null;
+    if(o.rackType === undefined) o.rackType = null;
+    if(o.palletCount === undefined) o.palletCount = null;
+    if(o.riskLevel === undefined) o.riskLevel = null;
+    if(!Array.isArray(o.analysisFlags)) o.analysisFlags = [];
+    return o;
+  }
+
+  function loadProject(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("layoutscan_sprint1_project");
+      if(!raw) return;
+      const data = JSON.parse(raw);
+      if(Array.isArray(data.objects)) state.objects = data.objects.map(migrateObject);
+      if(data.camera) state.camera = data.camera;
+      if(data.gridSize) state.gridSize = data.gridSize;
+      if(Array.isArray(data.layers) && data.layers.length) state.layers = data.layers;
+      if(data.view) state.view = Object.assign(state.view, data.view);
+      if(Array.isArray(data.truckTypes) && data.truckTypes.length) state.truckTypes = data.truckTypes;
+      if(data.selectedTruckId !== undefined) state.selectedTruckId = data.selectedTruckId;
+      if(data.lastKnownScore) state.sessionStartScore = data.lastKnownScore;
+      if(data.reportSettings) state.reportSettings = Object.assign(state.reportSettings, data.reportSettings);
+      if(Array.isArray(data.reportHistory)) state.reportHistory = data.reportHistory;
+      document.getElementById("gridSizeSelect").value = String(state.gridSize);
+      document.getElementById("chkDims").checked = state.view.showDimensions;
+      document.getElementById("chkNames").checked = state.view.showObjectNames;
+      document.getElementById("chkMeasureLines").checked = state.view.showMeasureLines;
+      document.getElementById("chkHeatmap").checked = state.view.showHeatmap;
+    }catch(err){ console.warn("Kunne ikke indlæse gemt projekt:", err); }
+  }
+
+  /* =========================================================
+     13. RAPPORT & EKSPORT (Sprint 5)
+     Læser udelukkende fra state (objects/analysis/truckTypes/...)
+     og genbruger eksisterende, urørte funktioner (render, fitToObjects,
+     resizeCanvas, worldToScreen m.fl.) som "black box" til PNG-eksport.
+     Ændrer intet i canvas-motoren, analysemotoren, dashboardet,
+     truckbiblioteket eller den låste UI fra Sprint 1-4.
+     ========================================================= */
+
+  // ---- Simpel i18n-struktur (forberedt til flere sprog, jf. krav) ----
+  const I18N = {
+    da: {
+      cover_sub:"Professionel lageranalyse", cover_customer:"Kunde", cover_project:"Projekt", cover_date:"Dato", cover_version:"Rapportversion",
+      resume:"Resumé", resume_intro:"Ledelsesresumé", layoutscore:"LayoutScore", vurdering:"Samlet vurdering", antal_fund:"Antal fund", risikoniveau:"Risikoniveau",
+      lagerdata:"Lagerdata", kpi_dashboard:"KPI-dashboard", layout:"Layout", heatmap:"Heatmap", analyse:"Analyse", forslag:"Automatiske forbedringsforslag",
+      konklusion:"Konklusion", kritisk:"Kritisk", advarsel:"Advarsel", info:"Information", prioritet_hoej:"Høj", prioritet_mellem:"Mellem", prioritet_lav:"Lav",
+      areal:"Lagerareal", reolareal:"Reolareal", gangareal:"Gangareal", ledigt:"Ledigt areal", antal_reoler:"Antal reoler", pallepladser:"Antal pallepladser", trucktype:"Valgt trucktype",
+      ikke_valgt:"Ikke valgt", footnote:"Udarbejdet med LayoutScan Pro by Nordic Operations",
+      dyn_note:"Bemærk: dynamisk genereret tekst (fund og forslag) vises på dansk i denne version, uanset valgt sprog."
+    },
+    en: {
+      cover_sub:"Professional warehouse analysis", cover_customer:"Customer", cover_project:"Project", cover_date:"Date", cover_version:"Report version",
+      resume:"Summary", resume_intro:"Executive summary", layoutscore:"LayoutScore", vurdering:"Overall assessment", antal_fund:"Number of findings", risikoniveau:"Risk level",
+      lagerdata:"Warehouse data", kpi_dashboard:"KPI dashboard", layout:"Layout", heatmap:"Heatmap", analyse:"Analysis", forslag:"Automated improvement suggestions",
+      konklusion:"Conclusion", kritisk:"Critical", advarsel:"Warning", info:"Information", prioritet_hoej:"High", prioritet_mellem:"Medium", prioritet_lav:"Low",
+      areal:"Warehouse area", reolareal:"Racking area", gangareal:"Aisle area", ledigt:"Free area", antal_reoler:"Number of racks", pallepladser:"Pallet positions", trucktype:"Selected truck type",
+      ikke_valgt:"Not selected", footnote:"Prepared with LayoutScan Pro by Nordic Operations",
+      dyn_note:"Note: dynamically generated text (findings and suggestions) is shown in Danish in this version, regardless of selected language."
+    }
+  };
+  function t(key){
+    const lang = state.reportSettings.language || "da";
+    return (I18N[lang] && I18N[lang][key]) || I18N.da[key] || key;
+  }
+
+  // ---- Generiske download-hjælpere ----
+  function downloadBlob(filename, content, mime){
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  function downloadDataUrl(filename, dataUrl){
+    const a = document.createElement("a");
+    a.href = dataUrl; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  function csvEscape(v){
+    const s = v==null ? "" : String(v);
+    return /[",\r\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }
+  function toCSV(rows){ return rows.map(r => r.map(csvEscape).join(",")).join("\r\n"); }
+  function xmlEscape(v){ return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  // ---- Tabel-byggere — genbruges af rapport, Excel og CSV ----
+  function buildKpiTable(){
+    if(!state.analysis) return [["Nøgletal","Værdi"]];
+    const k = state.analysis.kpi, s = state.analysis.score;
+    return [
+      ["Nøgletal","Værdi"],
+      ["Objekter", k.objectCount],
+      ["Pallepladser", k.palletCount],
+      ["Reolmeter", Number(k.rackMeters.toFixed(1))],
+      ["Antal reoler", k.rackCount],
+      ["Truckgange", k.aisleCount],
+      ["Kritiske gangbredder", k.criticalAisles],
+      ["Udnyttelsesgrad (%)", k.occupancyRate==null?"":Number(k.occupancyRate.toFixed(1))],
+      ["Areal (m²)", k.totalArea==null?"":Number(k.totalArea.toFixed(1))],
+      ["Ledigt areal (m²)", k.freeArea==null?"":Number(k.freeArea.toFixed(1))],
+      ["LayoutScore", s.overall],
+      ["Udnyttelse-score", s.utilization],
+      ["Flow-score", s.flow],
+      ["Truck-egnethed-score", s.aisles],
+      ["Sikkerhed-score", s.safety]
+    ];
+  }
+  function buildFindingsTable(){
+    const rows = [["Type","Niveau","Besked"]];
+    (state.analysis ? state.analysis.findings : []).forEach(f => rows.push([f.type, f.level, f.message]));
+    return rows;
+  }
+  function buildPalletTable(){
+    const rows = [["Reol","Type","Fag","Niveauer","Pallepladser pr. fag","Pallepladser i alt"]];
+    state.objects.filter(o => o.category === "reoler").forEach(o => {
+      rows.push([o.name, o.type, o.metadata.bays||"auto", o.metadata.levels||"auto", o.metadata.palletSpacesPerBay||"auto", o.palletCount||0]);
+    });
+    return rows;
+  }
+  function buildTruckTable(){
+    const rows = [["Navn","Bredde (m)","Længde (m)","Frihøjde (m)","Vendecirkel (m)","Anbef. gangbredde (m)","Maks løftehøjde (m)","Valgt"]];
+    state.truckTypes.forEach(tr => {
+      rows.push([tr.name, tr.width, tr.length, tr.freeHeight, tr.turningRadius, tr.recommendedAisle, tr.maxLiftHeight, tr.id===state.selectedTruckId ? "Ja" : "Nej"]);
+    });
+    return rows;
+  }
+  function buildRecommendationsTable(){
+    const rows = [["#","Prioritet","Forslag","Effekt/besparelse"]];
+    (state.analysis && state.analysis.recommendations ? state.analysis.recommendations : []).forEach((r,i) => {
+      const prio = r.severity==="red" ? "Høj" : r.severity==="orange" ? "Mellem" : "Lav";
+      rows.push([i+1, prio, r.text, r.impact]);
+    });
+    return rows;
+  }
+
+  // ---- Excel (SpreadsheetML/.xls — ægte flere-arks-projektmappe uden eksternt bibliotek) ----
+  function tableToWorksheetXML(name, rows){
+    const rowsXml = rows.map(r => "<Row>"+r.map(c => {
+      const isNum = typeof c === "number";
+      return '<Cell><Data ss:Type="'+(isNum?"Number":"String")+'">'+xmlEscape(c)+'</Data></Cell>';
+    }).join("")+"</Row>").join("");
+    return '<Worksheet ss:Name="'+xmlEscape(name)+'"><Table>'+rowsXml+'</Table></Worksheet>';
+  }
+  function exportExcel(){
+    const sheets = [
+      tableToWorksheetXML("KPI", buildKpiTable()),
+      tableToWorksheetXML("Fund", buildFindingsTable()),
+      tableToWorksheetXML("Pallepladser", buildPalletTable()),
+      tableToWorksheetXML("Truckdata", buildTruckTable()),
+      tableToWorksheetXML("Analyse", buildRecommendationsTable())
+    ].join("");
+    const xml = '<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>'
+      + '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
+      + sheets + '</Workbook>';
+    downloadBlob("layoutscan_export.xls", xml, "application/vnd.ms-excel");
+  }
+
+  // ---- CSV (fem separate filer, én pr. tabel) ----
+  function exportAllCSV(){
+    const tables = [
+      ["layoutscan_kpi.csv", buildKpiTable()],
+      ["layoutscan_fund.csv", buildFindingsTable()],
+      ["layoutscan_pallepladser.csv", buildPalletTable()],
+      ["layoutscan_truckdata.csv", buildTruckTable()],
+      ["layoutscan_analyse.csv", buildRecommendationsTable()]
+    ];
+    tables.forEach(([name, rows], i) => {
+      setTimeout(() => downloadBlob(name, "\uFEFF"+toCSV(rows), "text/csv;charset=utf-8"), i*180);
+    });
+  }
+
+  // ---- JSON (hele projektet) ----
+  function exportProjectJSON(){
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      layout: { camera: state.camera, gridSize: state.gridSize, layers: state.layers, view: state.view },
+      objects: state.objects,
+      truckTypes: state.truckTypes,
+      selectedTruckId: state.selectedTruckId,
+      analysis: state.analysis,
+      reportSettings: state.reportSettings,
+      reportHistory: state.reportHistory
+    };
+    downloadBlob("layoutscan_project.json", JSON.stringify(payload, null, 2), "application/json");
+  }
+
+  // ---- Høj-opløsnings PNG. Genbruger canvas/render/fitToObjects som en "black box":
+  // ingen af disse funktioner ændres — vi låner blot canvas'et midlertidigt. ----
+  function exportHighResPNG(forceHeatmap){
+    const prevCameraJSON = JSON.stringify(state.camera);
+    const prevHeatmap = state.view.showHeatmap;
+    const prevW = canvas.width, prevH = canvas.height, prevSW = canvas.style.width, prevSH = canvas.style.height;
+
+    const EXPORT_SCALE = 3;
+    const rect = wrap.getBoundingClientRect();
+    canvas.width = Math.round(rect.width*EXPORT_SCALE);
+    canvas.height = Math.round(rect.height*EXPORT_SCALE);
+    canvas.style.width = rect.width+"px";
+    canvas.style.height = rect.height+"px";
+    ctx.setTransform(EXPORT_SCALE,0,0,EXPORT_SCALE,0,0);
+
+    if(forceHeatmap !== null && forceHeatmap !== undefined) state.view.showHeatmap = forceHeatmap;
+    fitToObjects();
+
+    const dataUrl = canvas.toDataURL("image/png");
+
+    state.camera = JSON.parse(prevCameraJSON);
+    state.view.showHeatmap = prevHeatmap;
+    canvas.width = prevW; canvas.height = prevH;
+    canvas.style.width = prevSW; canvas.style.height = prevSH;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    render();
+
+    return dataUrl;
+  }
+
+  // ---- Rapportgenerering ----
+  const reportModal = document.getElementById("reportModal");
+  const reportContentEl = document.getElementById("reportContent");
+
+  function riskBadgeClass(level){ return level==="red"?"red":level==="orange"?"orange":level==="yellow"?"yellow":"green"; }
+
+  function tableRowsToHtml(rows, opts){
+    opts = opts || {};
+    let html = "<table class='rp-table'><thead><tr>"+rows[0].map(h=>"<th>"+escapeHtml(h)+"</th>").join("")+"</tr></thead><tbody>";
+    rows.slice(1).forEach(r => {
+      html += "<tr>"+r.map((c,i) => {
+        if(opts.badgeCol===i){
+          return "<td><span class='rp-badge "+riskBadgeClass(String(c).toLowerCase()==="red"||c==="Høj"?"red":(String(c).toLowerCase()==="yellow"||c==="Lav"?"yellow":"orange"))+"'>"+escapeHtml(c)+"</span></td>";
+        }
+        return "<td>"+escapeHtml(c)+"</td>";
+      }).join("")+"</tr>";
+    });
+    html += "</tbody></table>";
+    return html;
+  }
+
+  function generateReportHTML(){
+    if(!state.analysis){ reportContentEl.innerHTML = "<div class='rp-page'><p class='rp-text'>Analysen er ikke klar endnu — vent et øjeblik og prøv igen.</p></div>"; return; }
+    const rs = state.reportSettings;
+    const k = state.analysis.kpi, s = state.analysis.score;
+    const risk = riskLevelFromScore(s.overall, state.analysis.findings);
+    const truckName = state.analysis.truck ? state.analysis.truck.name : t("ikke_valgt");
+    const version = state.reportHistory.length + 1;
+    const today = new Date().toLocaleDateString(rs.language==="en"?"en-GB":"da-DK");
+
+    const layoutImg = exportHighResPNG(false);
+    const heatmapImg = exportHighResPNG(true);
+
+    const logoHtml = rs.logoDataUrl
+      ? '<img class="rp-cover-logo" src="'+rs.logoDataUrl+'">'
+      : '<div class="rp-cover-logo-fallback">'+escapeHtml((rs.companyName||"NO").slice(0,2).toUpperCase())+'</div>';
+
+    const critical = state.analysis.findings.filter(f=>f.level==="red");
+    const warning = state.analysis.findings.filter(f=>f.level==="yellow"||f.level==="orange");
+    const info = state.analysis.findings.filter(f=>f.level!=="red"&&f.level!=="yellow"&&f.level!=="orange");
+
+    const recs = state.analysis.recommendations || [];
+    const conclusionText = recs.length
+      ? "Layoutet vurderes samlet til \""+scoreRecommendationLabel(s.overall)+"\" (LayoutScore "+(s.overall==null?"–":s.overall)+"/100). De vigtigste forbedringsmuligheder er: "
+        + recs.slice(0,3).map(r=>r.text).join(" ") + (recs.length>3 ? " Se de resterende "+(recs.length-3)+" forslag i analyseafsnittet." : "")
+      : "Layoutet giver ikke anledning til konkrete handlingsforslag ud fra de nuværende regler. LayoutScore: "+(s.overall==null?"–":s.overall)+"/100.";
+
+    let html = "";
+
+    // ---- Forside ----
+    html += '<div class="rp-page rp-cover">'
+      + '<div class="rp-cover-top">'+logoHtml+'<div><div style="font-weight:800;font-size:16px;">LayoutScan Pro</div><div class="rp-cover-sub">'+escapeHtml(t("cover_sub"))+'</div></div></div>'
+      + '<div>'
+      + '<div class="rp-cover-title">'+escapeHtml(rs.reportTitle||"LayoutScan Pro — Lagerrapport")+'</div>'
+      + '<div class="rp-cover-meta">'
+      + '<b>'+escapeHtml(t("cover_customer"))+':</b> '+escapeHtml(rs.customerName||"–")+'<br>'
+      + '<b>'+escapeHtml(t("cover_project"))+':</b> '+escapeHtml(rs.projectName||"–")+'<br>'
+      + '<b>'+escapeHtml(t("cover_date"))+':</b> '+today+'<br>'
+      + '<b>'+escapeHtml(t("cover_version"))+':</b> v'+version
+      + '</div></div>'
+      + '<div class="rp-cover-footnote">'+escapeHtml(rs.header||"")+(rs.header?"<br>":"")+escapeHtml(t("footnote"))+'</div>'
+      + '</div>';
+
+    // ---- Resumé ----
+    html += '<div class="rp-page">'
+      + '<div class="rp-h1">'+escapeHtml(t("resume"))+'</div>'
+      + '<div class="rp-grid">'
+      + '<div class="rp-stat"><div class="v">'+(s.overall==null?"–":s.overall)+'/100</div><div class="l">'+escapeHtml(t("layoutscore"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v">'+scoreRecommendationLabel(s.overall)+'</div><div class="l">'+escapeHtml(t("vurdering"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v">'+state.analysis.findings.length+'</div><div class="l">'+escapeHtml(t("antal_fund"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v"><span class="rp-badge '+riskBadgeClass(risk.level)+'">'+risk.label+'</span></div><div class="l">'+escapeHtml(t("risikoniveau"))+'</div></div>'
+      + '</div>'
+      + '<div class="rp-h2">'+escapeHtml(t("konklusion"))+'</div>'
+      + '<p class="rp-text">'+escapeHtml(conclusionText)+'</p>'
+      + '<p class="rp-note">'+escapeHtml(t("dyn_note"))+'</p>'
+      + '</div>';
+
+    // ---- Lagerdata ----
+    html += '<div class="rp-page">'
+      + '<div class="rp-h1">'+escapeHtml(t("lagerdata"))+'</div>'
+      + '<div class="rp-grid">'
+      + '<div class="rp-stat"><div class="v">'+(k.totalArea==null?"–":k.totalArea.toFixed(0)+" m²")+'</div><div class="l">'+escapeHtml(t("areal"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v">'+k.rackArea.toFixed(0)+' m²</div><div class="l">'+escapeHtml(t("reolareal"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v">'+k.aisleArea.toFixed(0)+' m²</div><div class="l">'+escapeHtml(t("gangareal"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v">'+(k.freeArea==null?"–":k.freeArea.toFixed(0)+" m²")+'</div><div class="l">'+escapeHtml(t("ledigt"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v">'+k.rackCount+'</div><div class="l">'+escapeHtml(t("antal_reoler"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v">'+k.palletCount+'</div><div class="l">'+escapeHtml(t("pallepladser"))+'</div></div>'
+      + '<div class="rp-stat"><div class="v" style="font-size:13px;">'+escapeHtml(truckName)+'</div><div class="l">'+escapeHtml(t("trucktype"))+'</div></div>'
+      + '</div></div>';
+
+    // ---- KPI-dashboard ----
+    html += '<div class="rp-page">'
+      + '<div class="rp-h1">'+escapeHtml(t("kpi_dashboard"))+'</div>'
+      + tableRowsToHtml(buildKpiTable())
+      + '</div>';
+
+    // ---- Layout ----
+    html += '<div class="rp-page">'
+      + '<div class="rp-h1">'+escapeHtml(t("layout"))+'</div>'
+      + '<img class="rp-img" src="'+layoutImg+'">'
+      + '</div>';
+
+    // ---- Heatmap ----
+    html += '<div class="rp-page">'
+      + '<div class="rp-h1">'+escapeHtml(t("heatmap"))+'</div>'
+      + '<img class="rp-img" src="'+heatmapImg+'">'
+      + '<div class="rp-legend">'
+      + '<span><span class="dot" style="background:#3A9D5D"></span>OK</span>'
+      + '<span><span class="dot" style="background:#E1A73C"></span>Bør undersøges</span>'
+      + '<span><span class="dot" style="background:#E67E22"></span>Advarsel</span>'
+      + '<span><span class="dot" style="background:#C0392B"></span>Kritisk</span>'
+      + '<span><span class="dot" style="background:#8E7CC3"></span>Flaskehals / død zone</span>'
+      + '</div></div>';
+
+    // ---- Analyse ----
+    html += '<div class="rp-page">'
+      + '<div class="rp-h1">'+escapeHtml(t("analyse"))+'</div>'
+      + '<div class="rp-h2">'+escapeHtml(t("kritisk"))+' ('+critical.length+')</div>'
+      + (critical.length ? tableRowsToHtml([["Type","Niveau","Besked"]].concat(critical.map(f=>[f.type,f.level,f.message]))) : '<p class="rp-text">Ingen.</p>')
+      + '<div class="rp-h2">'+escapeHtml(t("advarsel"))+' ('+warning.length+')</div>'
+      + (warning.length ? tableRowsToHtml([["Type","Niveau","Besked"]].concat(warning.map(f=>[f.type,f.level,f.message]))) : '<p class="rp-text">Ingen.</p>')
+      + '<div class="rp-h2">'+escapeHtml(t("info"))+' ('+info.length+')</div>'
+      + (info.length ? tableRowsToHtml([["Type","Niveau","Besked"]].concat(info.map(f=>[f.type,f.level,f.message]))) : '<p class="rp-text">Ingen — denne kategori er reserveret til fremtidige fundtyper.</p>')
+      + '</div>';
+
+    // ---- Forbedringsforslag ----
+    html += '<div class="rp-page">'
+      + '<div class="rp-h1">'+escapeHtml(t("forslag"))+'</div>'
+      + (recs.length ? tableRowsToHtml(buildRecommendationsTable(), {badgeCol:1}) : '<p class="rp-text">Ingen forslag fundet ud fra de nuværende regler.</p>')
+      + '</div>';
+
+    // ---- Konklusion ----
+    html += '<div class="rp-page">'
+      + '<div class="rp-h1">'+escapeHtml(t("konklusion"))+'</div>'
+      + '<p class="rp-text">'+escapeHtml(conclusionText)+'</p>'
+      + '<p class="rp-note">'+escapeHtml(rs.footer||"")+'</p>'
+      + '<p class="rp-note">'+escapeHtml(t("footnote"))+' · v'+version+' · '+today+'</p>'
+      + '</div>';
+
+    reportContentEl.innerHTML = html;
+  }
+
+  function renderHistoryTable(){
+    const body = document.getElementById("historyBody");
+    body.innerHTML = state.reportHistory.slice().reverse().map(h =>
+      "<tr><td>"+escapeHtml(h.date)+"</td><td>v"+h.version+"</td><td>"+escapeHtml(h.user)+"</td><td>"+escapeHtml(h.comment)+"</td></tr>"
+    ).join("") || "<tr><td colspan='4' style='color:var(--text-mute);'>Ingen versioner gemt endnu.</td></tr>";
+  }
+
+  document.getElementById("btnOpenReport").addEventListener("click", () => {
+    document.getElementById("rsCompany").value = state.reportSettings.companyName;
+    document.getElementById("rsTitle").value = state.reportSettings.reportTitle;
+    document.getElementById("rsCustomer").value = state.reportSettings.customerName;
+    document.getElementById("rsProject").value = state.reportSettings.projectName;
+    document.getElementById("rsLanguage").value = state.reportSettings.language;
+    document.getElementById("rsHeader").value = state.reportSettings.header;
+    document.getElementById("rsFooter").value = state.reportSettings.footer;
+    renderHistoryTable();
+    reportModal.classList.add("open");
+    generateReportHTML();
+  });
+  document.getElementById("btnCloseReport").addEventListener("click", () => reportModal.classList.remove("open"));
+
+  function syncReportSettingsFromForm(){
+    state.reportSettings.companyName = document.getElementById("rsCompany").value || "Nordic Operations";
+    state.reportSettings.reportTitle = document.getElementById("rsTitle").value || "LayoutScan Pro — Lagerrapport";
+    state.reportSettings.customerName = document.getElementById("rsCustomer").value;
+    state.reportSettings.projectName = document.getElementById("rsProject").value;
+    state.reportSettings.language = document.getElementById("rsLanguage").value;
+    state.reportSettings.header = document.getElementById("rsHeader").value;
+    state.reportSettings.footer = document.getElementById("rsFooter").value;
+    scheduleSave();
+  }
+
+  document.getElementById("btnGenerateReport").addEventListener("click", () => { syncReportSettingsFromForm(); generateReportHTML(); });
+  document.getElementById("btnPrintReport").addEventListener("click", () => { syncReportSettingsFromForm(); generateReportHTML(); setTimeout(() => window.print(), 80); });
+  document.getElementById("btnExportPNG").addEventListener("click", () => downloadDataUrl("layoutscan_layout.png", exportHighResPNG(null)));
+  document.getElementById("btnExportExcel").addEventListener("click", exportExcel);
+  document.getElementById("btnExportCSV").addEventListener("click", exportAllCSV);
+  document.getElementById("btnExportJSON").addEventListener("click", exportProjectJSON);
+
+  document.getElementById("rsLogoFile").addEventListener("change", e => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { state.reportSettings.logoDataUrl = ev.target.result; scheduleSave(); generateReportHTML(); };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById("btnClearLogo").addEventListener("click", () => {
+    state.reportSettings.logoDataUrl = null;
+    document.getElementById("rsLogoFile").value = "";
+    scheduleSave(); generateReportHTML();
+  });
+
+  document.getElementById("btnSaveVersion").addEventListener("click", () => {
+    const user = document.getElementById("histUser").value.trim() || "Ukendt bruger";
+    const comment = document.getElementById("histComment").value.trim();
+    state.reportHistory.push({ date: new Date().toLocaleString("da-DK"), version: state.reportHistory.length+1, user, comment: comment||"–" });
+    document.getElementById("histComment").value = "";
+    renderHistoryTable();
+    scheduleSave();
+  });
+
+  /* =========================================================
+     12. INIT
+     ========================================================= */
+
+  loadProject();
+  populateTruckSelect();
+  resizeCanvas();
+  if(state.objects.length === 0){
+    state.camera = { panX: 400, panY: 260, zoom: 1 };
+  }
+  updateStatusBar();
+  runAnalysis();
+  render();
+
+})();
+</script>
+</body>
+</html>
